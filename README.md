@@ -4,6 +4,9 @@ Ein Tool, um Wohnungsgrundrisse in 2D zu skizzieren: Wände zeichnen, Möbel per
 Drag & Drop platzieren, verschieben, drehen und skalieren, Entwürfe als JSON
 speichern/laden – plus eine einfache 3D-Vorschau.
 
+**Live:** https://graeffkaifrank-svg.github.io/claudeTesting/ (baut nach jedem
+Push auf `main` automatisch neu, siehe `.github/workflows/deploy-pages.yml`).
+
 ## Entwicklung
 
 ```bash
