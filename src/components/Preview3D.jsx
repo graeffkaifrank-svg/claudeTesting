@@ -4,7 +4,58 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useDesignStore } from '../store/useDesignStore';
 
 const WALL_HEIGHT_CM = 250;
+const WINDOW_SILL_CM = 90; // typical sill height above the floor
 const CM = 1 / 100; // cm -> meters
+
+// A door/window is just a freestanding furniture item in the 2D data (no
+// real wall-opening concept), so for the 3D view we detect which wall it
+// sits on (close to the wall's line, overlapping its span) and cut an
+// actual opening into that wall instead of drawing a box that gets buried
+// inside the solid wall geometry.
+function wallFrame(wall) {
+  const dx = wall.x2 - wall.x1;
+  const dy = wall.y2 - wall.y1;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return null;
+  return { ux: dx / len, uy: dy / len, len };
+}
+
+function projectOntoWall(wall, frame, point) {
+  const px = point.x - wall.x1;
+  const py = point.y - wall.y1;
+  const t = px * frame.ux + py * frame.uy;
+  const perp = Math.abs(px * frame.uy - py * frame.ux);
+  return { t, perp };
+}
+
+function mergeRanges(ranges) {
+  const sorted = [...ranges].sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const r of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+    else merged.push({ ...r });
+  }
+  return merged;
+}
+
+// Adds one wall-aligned box spanning [tStart, tEnd] along the wall and
+// [yBottom, yTop] in height, all in cm; converts to meters internally.
+function addWallBox(scene, wall, frame, tStart, tEnd, yBottom, yTop, thicknessCm, material) {
+  const lengthCm = tEnd - tStart;
+  const heightCm = yTop - yBottom;
+  if (lengthCm <= 0.5 || heightCm <= 0.5) return;
+  const centerT = (tStart + tEnd) / 2;
+  const cx = wall.x1 + frame.ux * centerT;
+  const cy = wall.y1 + frame.uy * centerT;
+  const angle = Math.atan2(frame.uy, frame.ux);
+
+  const geometry = new THREE.BoxGeometry(lengthCm * CM, heightCm * CM, thicknessCm * CM);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(cx * CM, (yBottom + heightCm / 2) * CM, cy * CM);
+  mesh.rotation.y = -angle;
+  scene.add(mesh);
+}
 
 export default function Preview3D({ onClose }) {
   const containerRef = useRef(null);
@@ -68,35 +119,75 @@ export default function Preview3D({ onClose }) {
     scene.add(grid);
 
     const wallMaterial = new THREE.MeshStandardMaterial({ color: '#8f95a3' });
+    const doorMaterial = new THREE.MeshStandardMaterial({ color: '#8a5a2b' });
+    const windowGlassMaterial = new THREE.MeshStandardMaterial({
+      color: '#a9d6e5',
+      transparent: true,
+      opacity: 0.45,
+    });
+
+    const openable = furniture.filter((f) => f.type === 'door' || f.type === 'window');
+    const assignedIds = new Set();
+
     walls.forEach((w) => {
-      const dx = w.x2 - w.x1;
-      const dy = w.y2 - w.y1;
-      const length = Math.hypot(dx, dy) * CM;
-      if (length <= 0) return;
-      const angle = Math.atan2(dy, dx);
-      const thickness = (w.thickness || 15) * CM;
-      const height = WALL_HEIGHT_CM * CM;
+      const frame = wallFrame(w);
+      if (!frame) return;
+      const thickness = w.thickness || 15;
 
-      const geometry = new THREE.BoxGeometry(length, height, thickness);
-      const mesh = new THREE.Mesh(geometry, wallMaterial);
-      const midX = ((w.x1 + w.x2) / 2) * CM;
-      const midZ = ((w.y1 + w.y2) / 2) * CM;
-      mesh.position.set(midX, height / 2, midZ);
-      mesh.rotation.y = -angle;
-      scene.add(mesh);
+      // Which doors/windows sit on this wall: close to its line and
+      // overlapping its span (in the wall's own cm coordinates).
+      const openings = [];
+      openable.forEach((item) => {
+        const { t, perp } = projectOntoWall(w, frame, { x: item.x, y: item.y });
+        if (perp > thickness / 2 + 25) return;
+        const halfWidth = item.width / 2;
+        const start = t - halfWidth;
+        const end = t + halfWidth;
+        if (end <= 0 || start >= frame.len) return;
+        assignedIds.add(item.id);
+        openings.push({ item, start: Math.max(start, 0), end: Math.min(end, frame.len) });
+      });
+
+      // Solid wall fill = the wall's span minus the union of all openings.
+      const covered = mergeRanges(openings.map((o) => ({ start: o.start, end: o.end })));
+      let cursor = 0;
+      covered.forEach((range) => {
+        addWallBox(scene, w, frame, cursor, range.start, 0, WALL_HEIGHT_CM, thickness, wallMaterial);
+        cursor = range.end;
+      });
+      addWallBox(scene, w, frame, cursor, frame.len, 0, WALL_HEIGHT_CM, thickness, wallMaterial);
+
+      // Per opening: header (and sill, for windows) plus a visible leaf/pane.
+      openings.forEach(({ item, start, end }) => {
+        if (item.type === 'door') {
+          const doorHeight = Math.min(item.height || 205, WALL_HEIGHT_CM);
+          addWallBox(scene, w, frame, start, end, doorHeight, WALL_HEIGHT_CM, thickness, wallMaterial);
+          addWallBox(scene, w, frame, start, end, 0, doorHeight, thickness * 0.6, doorMaterial);
+        } else {
+          const sill = Math.min(WINDOW_SILL_CM, WALL_HEIGHT_CM);
+          const top = Math.min(sill + (item.height || 120), WALL_HEIGHT_CM);
+          addWallBox(scene, w, frame, start, end, 0, sill, thickness, wallMaterial);
+          addWallBox(scene, w, frame, start, end, top, WALL_HEIGHT_CM, thickness, wallMaterial);
+          addWallBox(scene, w, frame, start, end, sill, top, thickness * 0.3, windowGlassMaterial);
+        }
+      });
     });
 
-    furniture.forEach((item) => {
-      const width = item.width * CM;
-      const depth = item.depth * CM;
-      const height = (item.height || 60) * CM;
-      const geometry = new THREE.BoxGeometry(width, height, depth);
-      const material = new THREE.MeshStandardMaterial({ color: item.color || '#8899aa' });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(item.x * CM, height / 2, item.y * CM);
-      mesh.rotation.y = -((item.rotation || 0) * Math.PI) / 180;
-      scene.add(mesh);
-    });
+    // Doors/windows that aren't placed on any wall (or all other furniture)
+    // still get drawn as plain boxes so nothing silently disappears.
+    furniture
+      .filter((item) => !assignedIds.has(item.id))
+      .forEach((item) => {
+        const width = item.width * CM;
+        const depth = item.depth * CM;
+        const height = (item.height || 60) * CM;
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const material = new THREE.MeshStandardMaterial({ color: item.color || '#8899aa' });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(item.x * CM, height / 2, item.y * CM);
+        mesh.rotation.y = -((item.rotation || 0) * Math.PI) / 180;
+        scene.add(mesh);
+      });
 
     const radius = Math.max(floorW, floorD);
     camera.position.set(centerX + radius * 0.7, radius * 0.8, centerZ + radius * 0.7);
