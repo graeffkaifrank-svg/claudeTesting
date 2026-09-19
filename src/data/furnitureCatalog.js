@@ -71,8 +71,34 @@ export const FURNITURE_CATALOG = [
       { type: 'fence', label: 'Zaunelement', width: 180, depth: 8, height: 120, color: '#8a6d4c' },
     ],
   },
+  {
+    category: 'Bereiche / Markierungen',
+    items: [
+      { type: 'zone-generic', label: 'Bereich (frei)', width: 300, depth: 300, height: 1, color: '#f4a300', shape: 'zone' },
+      { type: 'zone-parking', label: 'Parkplatz', width: 500, depth: 250, height: 1, color: '#4a6fa5', shape: 'zone' },
+      { type: 'zone-play', label: 'Spielbereich', width: 500, depth: 500, height: 1, color: '#e07a5f', shape: 'zone' },
+    ],
+  },
 ];
 
 export const FURNITURE_BY_TYPE = Object.fromEntries(
   FURNITURE_CATALOG.flatMap((group) => group.items).map((item) => [item.type, item])
 );
+
+// Freeform presets: unlike furniture (fixed rect with width/depth/rotation),
+// these become editable polygons (`shapes` in the store) — they start as a
+// plain rectangle but every corner can be dragged independently afterwards.
+export const SHAPE_PRESETS = [
+  { type: 'freeform-garage', label: 'Garage (frei formbar)', width: 300, depth: 550, height: 250, color: '#9aa5b1' },
+  { type: 'freeform-building', label: 'Gebäude (frei formbar)', width: 400, depth: 400, height: 250, color: '#b5a68c' },
+  { type: 'freeform-area', label: 'Fläche (frei formbar)', width: 300, depth: 300, height: 1, color: '#f4a300' },
+];
+
+export function rectPoints(cx, cy, width, depth) {
+  return [
+    { x: cx - width / 2, y: cy - depth / 2 },
+    { x: cx + width / 2, y: cy - depth / 2 },
+    { x: cx + width / 2, y: cy + depth / 2 },
+    { x: cx - width / 2, y: cy + depth / 2 },
+  ];
+}

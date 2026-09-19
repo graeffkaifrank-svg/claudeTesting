@@ -19,6 +19,23 @@ function NumberField({ label, value, onChange, step = 1, min, suffix }) {
   );
 }
 
+function LayerField({ layerId, onChange }) {
+  const layers = useDesignStore((s) => s.layers);
+  if (layers.length <= 1) return null;
+  return (
+    <label className="prop-field">
+      <span>Ebene</span>
+      <select value={layerId ?? layers[0].id} onChange={(e) => onChange(e.target.value)}>
+        {layers.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function WallProperties({ wall }) {
   const updateWall = useDesignStore((s) => s.updateWall);
   const removeWall = useDesignStore((s) => s.removeWall);
@@ -45,6 +62,7 @@ function WallProperties({ wall }) {
         suffix="cm"
         onChange={(v) => updateWall(wall.id, { thickness: Math.max(5, v) })}
       />
+      <LayerField layerId={wall.layerId} onChange={(layerId) => updateWall(wall.id, { layerId })} />
       <button type="button" className="danger" onClick={() => removeWall(wall.id)}>
         Wand löschen
       </button>
@@ -98,8 +116,49 @@ function FurnitureProperties({ item }) {
           onChange={(e) => updateFurniture(item.id, { color: e.target.value })}
         />
       </label>
+      <LayerField layerId={item.layerId} onChange={(layerId) => updateFurniture(item.id, { layerId })} />
       <button type="button" className="danger" onClick={() => removeFurniture(item.id)}>
         Objekt löschen
+      </button>
+    </div>
+  );
+}
+
+function ShapeProperties({ shape }) {
+  const updateShape = useDesignStore((s) => s.updateShape);
+  const removeShape = useDesignStore((s) => s.removeShape);
+
+  return (
+    <div className="props">
+      <h3>Freiformfläche</h3>
+      <label className="prop-field">
+        <span>Bezeichnung</span>
+        <input
+          type="text"
+          value={shape.label}
+          onChange={(e) => updateShape(shape.id, { label: e.target.value })}
+        />
+      </label>
+      <NumberField
+        label="Höhe"
+        value={shape.height}
+        step={5}
+        min={1}
+        suffix="cm"
+        onChange={(v) => updateShape(shape.id, { height: Math.max(1, v) })}
+      />
+      <label className="prop-field">
+        <span>Farbe</span>
+        <input
+          type="color"
+          value={shape.color}
+          onChange={(e) => updateShape(shape.id, { color: e.target.value })}
+        />
+      </label>
+      <LayerField layerId={shape.layerId} onChange={(layerId) => updateShape(shape.id, { layerId })} />
+      <p className="props-empty-hint">Eckpunkte lassen sich direkt im Grundriss anfassen und verschieben.</p>
+      <button type="button" className="danger" onClick={() => removeShape(shape.id)}>
+        Fläche löschen
       </button>
     </div>
   );
@@ -108,6 +167,7 @@ function FurnitureProperties({ item }) {
 function SummaryProperties() {
   const walls = useDesignStore((s) => s.walls);
   const furniture = useDesignStore((s) => s.furniture);
+  const shapes = useDesignStore((s) => s.shapes);
   const totalWallLength = walls.reduce((sum, w) => sum + Math.hypot(w.x2 - w.x1, w.y2 - w.y1), 0);
 
   return (
@@ -119,8 +179,13 @@ function SummaryProperties() {
       <p className="prop-summary-line">
         <strong>{furniture.length}</strong> Möbelstücke
       </p>
+      {shapes.length > 0 && (
+        <p className="prop-summary-line">
+          <strong>{shapes.length}</strong> Freiformflächen
+        </p>
+      )}
       <p className="props-empty-hint">
-        Wähle eine Wand oder ein Möbelstück aus, um Details zu bearbeiten.
+        Wähle ein Element aus, um Details zu bearbeiten.
       </p>
     </div>
   );
@@ -131,6 +196,7 @@ export default function PropertiesPanel() {
   const selectedKind = useDesignStore((s) => s.selectedKind);
   const walls = useDesignStore((s) => s.walls);
   const furniture = useDesignStore((s) => s.furniture);
+  const shapes = useDesignStore((s) => s.shapes);
 
   let content;
   if (selectedKind === 'wall') {
@@ -139,6 +205,9 @@ export default function PropertiesPanel() {
   } else if (selectedKind === 'furniture') {
     const item = furniture.find((f) => f.id === selectedId);
     content = item ? <FurnitureProperties item={item} /> : <SummaryProperties />;
+  } else if (selectedKind === 'shape') {
+    const shape = shapes.find((s) => s.id === selectedId);
+    content = shape ? <ShapeProperties shape={shape} /> : <SummaryProperties />;
   } else {
     content = <SummaryProperties />;
   }

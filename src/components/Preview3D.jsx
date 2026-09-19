@@ -59,8 +59,17 @@ function addWallBox(scene, wall, frame, tStart, tEnd, yBottom, yTop, thicknessCm
 
 export default function Preview3D({ onClose }) {
   const containerRef = useRef(null);
-  const walls = useDesignStore((s) => s.walls);
-  const furniture = useDesignStore((s) => s.furniture);
+  const allWalls = useDesignStore((s) => s.walls);
+  const allFurniture = useDesignStore((s) => s.furniture);
+  const allShapes = useDesignStore((s) => s.shapes);
+  const layers = useDesignStore((s) => s.layers);
+
+  // Hidden layers stay hidden in the 3D view too.
+  const visibleLayerIds = new Set(layers.filter((l) => l.visible).map((l) => l.id));
+  const isVisible = (item) => !item.layerId || visibleLayerIds.has(item.layerId);
+  const walls = allWalls.filter(isVisible);
+  const furniture = allFurniture.filter(isVisible);
+  const shapes = allShapes.filter(isVisible);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -97,6 +106,7 @@ export default function Preview3D({ onClose }) {
       extend(f.x - f.width, f.y - f.depth);
       extend(f.x + f.width, f.y + f.depth);
     });
+    shapes.forEach((s) => s.points.forEach((p) => extend(p.x, p.y)));
     if (!hasContent) {
       bounds.minX = 0; bounds.maxX = 500; bounds.minY = 0; bounds.maxY = 400;
     }
@@ -213,6 +223,25 @@ export default function Preview3D({ onClose }) {
         scene.add(mesh);
       });
 
+    shapes.forEach((shape) => {
+      if (!shape.points || shape.points.length < 3) return;
+      // Build the 2D outline with y negated so the extrusion (see rotation
+      // below) lands on the same world axis convention as everything else
+      // here (2D y -> world z, not -z).
+      const outline = new THREE.Shape(shape.points.map((p) => new THREE.Vector2(p.x * CM, -p.y * CM)));
+      const geometry = new THREE.ExtrudeGeometry(outline, {
+        depth: Math.max(1, shape.height || 250) * CM,
+        bevelEnabled: false,
+      });
+      const material = new THREE.MeshStandardMaterial({
+        color: shape.color || '#9aa5b1',
+        side: THREE.DoubleSide, // polygon winding depends on click order, don't risk culled faces
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.rotation.x = -Math.PI / 2;
+      scene.add(mesh);
+    });
+
     const radius = Math.max(floorW, floorD);
     camera.position.set(centerX + radius * 0.7, radius * 0.8, centerZ + radius * 0.7);
 
@@ -256,7 +285,7 @@ export default function Preview3D({ onClose }) {
       });
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
-  }, [walls, furniture]);
+  }, [walls, furniture, shapes]);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

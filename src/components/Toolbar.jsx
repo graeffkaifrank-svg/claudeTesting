@@ -1,9 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
 import { downloadJSON, readJSONFile, designFilename } from '../utils/fileIO';
+import LayerPanel from './LayerPanel';
 
 export default function Toolbar({ onOpen3D }) {
   const fileInputRef = useRef(null);
+  const [showLayers, setShowLayers] = useState(false);
 
   const name = useDesignStore((s) => s.name);
   const setName = useDesignStore((s) => s.setName);
@@ -24,6 +26,9 @@ export default function Toolbar({ onOpen3D }) {
   const future = useDesignStore((s) => s.future);
   const removeSelected = useDesignStore((s) => s.removeSelected);
   const selectedId = useDesignStore((s) => s.selectedId);
+  const copySelected = useDesignStore((s) => s.copySelected);
+  const pasteClipboard = useDesignStore((s) => s.pasteClipboard);
+  const clipboard = useDesignStore((s) => s.clipboard);
 
   const handleNew = () => {
     if (dirty && !window.confirm('Aktueller Entwurf wurde nicht gespeichert. Trotzdem neu beginnen?')) return;
@@ -78,6 +83,16 @@ export default function Toolbar({ onOpen3D }) {
         </div>
 
         <div className="toolbar-group">
+          <button type="button" onClick={copySelected} disabled={!selectedId} title="Kopieren (Strg+C)">📋 Kopieren</button>
+          <button type="button" onClick={pasteClipboard} disabled={!clipboard} title="Einfügen (Strg+V)">📌 Einfügen</button>
+        </div>
+
+        <div className="toolbar-group" style={{ position: 'relative' }}>
+          <button type="button" onClick={() => setShowLayers((v) => !v)}>🗂 Ebenen</button>
+          {showLayers && <LayerPanel onClose={() => setShowLayers(false)} />}
+        </div>
+
+        <div className="toolbar-group">
           <button type="button" onClick={onOpen3D}>🧊 3D-Ansicht</button>
         </div>
       </div>
@@ -89,6 +104,9 @@ export default function Toolbar({ onOpen3D }) {
           </button>
           <button type="button" className={tool === 'wall' ? 'active' : ''} onClick={() => setTool('wall')}>
             🧱 Wand zeichnen
+          </button>
+          <button type="button" className={tool === 'freeform' ? 'active' : ''} onClick={() => setTool('freeform')}>
+            ✏️ Freiform zeichnen
           </button>
         </div>
 

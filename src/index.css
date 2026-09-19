@@ -63,7 +63,8 @@ button.danger:hover {
 }
 
 input[type='text'],
-input[type='number'] {
+input[type='number'],
+select {
   font-family: inherit;
   font-size: 0.9rem;
   border: 1px solid var(--border);
@@ -117,6 +118,88 @@ input[type='number'] {
 
 .toolbar-field input[type='number'] {
   width: 70px;
+}
+
+.layer-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 260px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 10px;
+  z-index: 20;
+}
+
+.layer-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.layer-panel-header button {
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+}
+
+.layer-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.layer-row.active {
+  background: #fdecef;
+  border-color: var(--accent);
+}
+
+.layer-visibility,
+.layer-remove {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+
+.layer-name {
+  flex: 1;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  font-size: 0.88rem;
+}
+
+.layer-name-input {
+  flex: 1;
+}
+
+.layer-add {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.layer-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: 0;
 }
 
 .project-name {
