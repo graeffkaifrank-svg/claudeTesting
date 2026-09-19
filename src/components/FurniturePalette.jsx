@@ -16,12 +16,7 @@ export default function FurniturePalette() {
   const handleClickAdd = (item) => {
     setTool('select');
     const id = addFurniture({
-      type: item.type,
-      label: item.label,
-      color: item.color,
-      width: item.width,
-      depth: item.depth,
-      height: item.height,
+      ...item,
       x: 200,
       y: 200,
       rotation: 0,

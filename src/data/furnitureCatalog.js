@@ -54,6 +54,23 @@ export const FURNITURE_CATALOG = [
       { type: 'window', label: 'Fenster', width: 120, depth: 10, height: 120, color: '#8ecae6' },
     ],
   },
+  {
+    category: 'Garten & Außenbereich',
+    items: [
+      { type: 'tree', label: 'Baum', width: 400, depth: 400, height: 500, color: '#5b8a4f', shape: 'circle' },
+      { type: 'shrub', label: 'Strauch', width: 100, depth: 100, height: 90, color: '#6f9c5c', shape: 'circle' },
+      { type: 'hedge', label: 'Hecke (Element)', width: 100, depth: 40, height: 100, color: '#5a7d4a' },
+      { type: 'lawn', label: 'Rasenfläche', width: 400, depth: 400, height: 1, color: '#8fbf6e' },
+      { type: 'terrace', label: 'Terrasse', width: 300, depth: 250, height: 3, color: '#c9b79c' },
+      { type: 'garden-path', label: 'Gartenweg (Element)', width: 100, depth: 60, height: 2, color: '#c7c2b8' },
+      { type: 'pool', label: 'Pool', width: 400, depth: 200, height: 20, color: '#5fb3d9' },
+      { type: 'garden-shed', label: 'Gartenhaus', width: 200, depth: 150, height: 220, color: '#a5793f' },
+      { type: 'garage', label: 'Garage', width: 300, depth: 550, height: 250, color: '#9aa5b1' },
+      { type: 'garden-seating', label: 'Sitzgruppe', width: 150, depth: 150, height: 45, color: '#8a6d4c' },
+      { type: 'grill', label: 'Grill', width: 60, depth: 60, height: 100, color: '#3d3d3d' },
+      { type: 'fence', label: 'Zaunelement', width: 180, depth: 8, height: 120, color: '#8a6d4c' },
+    ],
+  },
 ];
 
 export const FURNITURE_BY_TYPE = Object.fromEntries(

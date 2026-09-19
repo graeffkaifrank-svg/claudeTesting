@@ -1,4 +1,4 @@
-import { Group, Rect, Text, Line, Arc } from 'react-konva';
+import { Group, Rect, Ellipse, Circle, Text, Line, Arc } from 'react-konva';
 
 // Extra symbol drawn on top of the base rectangle for a few furniture
 // types, to make the floor plan read like a real one (door swing, window
@@ -50,6 +50,8 @@ function Decoration({ item }) {
       return (
         <Rect x={6} y={6} width={w - 12} height={d * 0.28} fill="rgba(255,255,255,0.5)" cornerRadius={4} />
       );
+    case 'tree':
+      return <Circle x={w / 2} y={d / 2} radius={Math.min(w, d) * 0.12} fill="rgba(90,60,30,0.55)" />;
     default:
       return null;
   }
@@ -84,18 +86,30 @@ export default function FurnitureShape({ item, isSelected, draggable, onSelect, 
         onDragEnd(item.id, { x: node.x(), y: node.y() });
       }}
     >
-      <Rect
-        x={0}
-        y={0}
-        width={item.width}
-        height={item.depth}
-        fill={item.color}
-        stroke={isSelected ? '#e94560' : '#33333366'}
-        strokeWidth={isSelected ? 2.5 : 1}
-        cornerRadius={Math.min(6, item.width * 0.05, item.depth * 0.05)}
-        offsetX={0}
-        offsetY={0}
-      />
+      {item.shape === 'circle' ? (
+        <Ellipse
+          x={item.width / 2}
+          y={item.depth / 2}
+          radiusX={item.width / 2}
+          radiusY={item.depth / 2}
+          fill={item.color}
+          stroke={isSelected ? '#e94560' : '#33333366'}
+          strokeWidth={isSelected ? 2.5 : 1}
+        />
+      ) : (
+        <Rect
+          x={0}
+          y={0}
+          width={item.width}
+          height={item.depth}
+          fill={item.color}
+          stroke={isSelected ? '#e94560' : '#33333366'}
+          strokeWidth={isSelected ? 2.5 : 1}
+          cornerRadius={Math.min(6, item.width * 0.05, item.depth * 0.05)}
+          offsetX={0}
+          offsetY={0}
+        />
+      )}
       <Decoration item={item} />
       <Text
         text={item.label}

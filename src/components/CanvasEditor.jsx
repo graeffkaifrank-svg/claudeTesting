@@ -6,13 +6,33 @@ import { FURNITURE_BY_TYPE } from '../data/furnitureCatalog';
 import WallShape from './WallShape';
 import FurnitureShape from './FurnitureShape';
 
-const MIN_SCALE = 0.15;
+const MIN_SCALE = 0.03; // zoomed out enough to fit a large plot/garden
 const MAX_SCALE = 6;
 const BASE_SCALE = 1.2; // px per cm at zoom = 1
 
+// Grid step (and the coarser "major" line every few steps) adapts to zoom,
+// so a small room and a whole property both get a readable grid instead of
+// either a solid smear of lines or one that's clipped by the render cap.
+const GRID_STEPS_CM = [
+  { step: 10, major: 50 },
+  { step: 20, major: 100 },
+  { step: 50, major: 100 },
+  { step: 100, major: 500 },
+  { step: 200, major: 1000 },
+  { step: 500, major: 1000 },
+  { step: 1000, major: 5000 },
+  { step: 2000, major: 10000 },
+  { step: 5000, major: 10000 },
+];
+const MIN_LINE_SPACING_PX = 45;
+
+function pickGridStep(stageScale) {
+  const found = GRID_STEPS_CM.find(({ step }) => step * stageScale >= MIN_LINE_SPACING_PX);
+  return found ?? GRID_STEPS_CM[GRID_STEPS_CM.length - 1];
+}
+
 function GridLines({ width, height, stageScale, stagePos }) {
-  const step = 50; // cm, minor grid line
-  const majorEvery = 100; // cm, bold every meter
+  const { step, major: majorEvery } = pickGridStep(stageScale);
 
   const minX = -stagePos.x / stageScale;
   const minY = -stagePos.y / stageScale;
@@ -221,12 +241,7 @@ export default function CanvasEditor() {
       const point = snapToGrid ? { x: snapValue(raw.x, GRID_SIZE), y: snapValue(raw.y, GRID_SIZE) } : raw;
 
       const id = addFurniture({
-        type: def.type,
-        label: def.label,
-        color: def.color,
-        width: def.width,
-        depth: def.depth,
-        height: def.height,
+        ...def,
         x: point.x,
         y: point.y,
         rotation: 0,

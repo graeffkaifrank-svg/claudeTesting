@@ -174,18 +174,42 @@ export default function Preview3D({ onClose }) {
     });
 
     // Doors/windows that aren't placed on any wall (or all other furniture)
-    // still get drawn as plain boxes so nothing silently disappears.
+    // still get drawn as plain boxes/cylinders so nothing silently disappears.
     furniture
       .filter((item) => !assignedIds.has(item.id))
       .forEach((item) => {
-        const width = item.width * CM;
-        const depth = item.depth * CM;
         const height = (item.height || 60) * CM;
-        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const rotationY = -((item.rotation || 0) * Math.PI) / 180;
+
+        if (item.type === 'tree') {
+          const canopyRadius = (Math.min(item.width, item.depth) / 2) * CM;
+          const trunkHeight = Math.min(height * 0.3, 1.5);
+          const trunk = new THREE.Mesh(
+            new THREE.CylinderGeometry(canopyRadius * 0.12, canopyRadius * 0.15, trunkHeight, 8),
+            new THREE.MeshStandardMaterial({ color: '#6b4a24' })
+          );
+          trunk.position.set(item.x * CM, trunkHeight / 2, item.y * CM);
+          scene.add(trunk);
+
+          const canopy = new THREE.Mesh(
+            new THREE.ConeGeometry(canopyRadius, height - trunkHeight, 10),
+            new THREE.MeshStandardMaterial({ color: item.color || '#5b8a4f' })
+          );
+          canopy.position.set(item.x * CM, trunkHeight + (height - trunkHeight) / 2, item.y * CM);
+          scene.add(canopy);
+          return;
+        }
+
         const material = new THREE.MeshStandardMaterial({ color: item.color || '#8899aa' });
-        const mesh = new THREE.Mesh(geometry, material);
+        let mesh;
+        if (item.shape === 'circle') {
+          const radius = (Math.min(item.width, item.depth) / 2) * CM;
+          mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 20), material);
+        } else {
+          mesh = new THREE.Mesh(new THREE.BoxGeometry(item.width * CM, height, item.depth * CM), material);
+        }
         mesh.position.set(item.x * CM, height / 2, item.y * CM);
-        mesh.rotation.y = -((item.rotation || 0) * Math.PI) / 180;
+        mesh.rotation.y = rotationY;
         scene.add(mesh);
       });
 
