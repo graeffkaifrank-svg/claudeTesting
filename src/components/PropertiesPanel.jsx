@@ -1,17 +1,40 @@
+import { useEffect, useState } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
 import { formatLength, cmToMeters } from '../utils/geometry';
 
 function NumberField({ label, value, onChange, step = 1, min, suffix }) {
+  const display = Number.isFinite(value) ? Math.round(value * 100) / 100 : '';
+  // Keep what's on screen as free-typed text while the field is focused, and
+  // only snap it back to the (rounded) numeric value on blur. A plain
+  // controlled `value={number}` re-formats on every keystroke, so clearing
+  // the field to type a fresh number immediately bounces back to "0" with
+  // the cursor at the end — every next digit lands after that stray zero.
+  const [draft, setDraft] = useState(String(display));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(String(display));
+  }, [display, focused]);
+
   return (
     <label className="prop-field">
       <span>{label}</span>
       <span className="prop-input">
         <input
           type="number"
-          value={Number.isFinite(value) ? Math.round(value * 100) / 100 : ''}
+          value={draft}
           step={step}
           min={min}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onFocus={() => setFocused(true)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const num = Number(e.target.value);
+            if (e.target.value !== '' && Number.isFinite(num)) onChange(num);
+          }}
+          onBlur={() => {
+            setFocused(false);
+            if (draft === '' || !Number.isFinite(Number(draft))) setDraft(String(display));
+          }}
         />
         {suffix && <span className="prop-suffix">{suffix}</span>}
       </span>
