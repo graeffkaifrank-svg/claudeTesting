@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
 import { formatLength, cmToMeters } from '../utils/geometry';
 
-function NumberField({ label, value, onChange, step = 1, min, suffix }) {
+function NumberField({ label, value, onChange, step = 1, min, max, suffix }) {
   const display = Number.isFinite(value) ? Math.round(value * 100) / 100 : '';
   // Keep what's on screen as free-typed text while the field is focused, and
   // only snap it back to the (rounded) numeric value on blur. A plain
@@ -25,6 +25,7 @@ function NumberField({ label, value, onChange, step = 1, min, suffix }) {
           value={draft}
           step={step}
           min={min}
+          max={max}
           onFocus={() => setFocused(true)}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -139,6 +140,24 @@ function FurnitureProperties({ item }) {
           onChange={(e) => updateFurniture(item.id, { color: e.target.value })}
         />
       </label>
+      <NumberField
+        label="Schriftgröße"
+        value={item.fontSize ?? Math.min(item.shape === 'zone' ? 16 : 14, item.width / 6, item.depth / 2)}
+        step={1}
+        min={6}
+        max={72}
+        suffix="pt"
+        onChange={(v) => updateFurniture(item.id, { fontSize: Math.max(6, v) })}
+      />
+      <NumberField
+        label="Deckkraft"
+        value={Math.round((item.opacity ?? 1) * 100)}
+        step={5}
+        min={0}
+        max={100}
+        suffix="%"
+        onChange={(v) => updateFurniture(item.id, { opacity: Math.min(100, Math.max(0, v)) / 100 })}
+      />
       <LayerField layerId={item.layerId} onChange={(layerId) => updateFurniture(item.id, { layerId })} />
       <button type="button" className="danger" onClick={() => removeFurniture(item.id)}>
         Objekt löschen
@@ -178,6 +197,24 @@ function ShapeProperties({ shape }) {
           onChange={(e) => updateShape(shape.id, { color: e.target.value })}
         />
       </label>
+      <NumberField
+        label="Schriftgröße"
+        value={shape.fontSize ?? 13}
+        step={1}
+        min={6}
+        max={72}
+        suffix="pt"
+        onChange={(v) => updateShape(shape.id, { fontSize: Math.max(6, v) })}
+      />
+      <NumberField
+        label="Deckkraft"
+        value={Math.round((shape.opacity ?? 1) * 100)}
+        step={5}
+        min={0}
+        max={100}
+        suffix="%"
+        onChange={(v) => updateShape(shape.id, { opacity: Math.min(100, Math.max(0, v)) / 100 })}
+      />
       <LayerField layerId={shape.layerId} onChange={(layerId) => updateShape(shape.id, { layerId })} />
       <p className="props-empty-hint">Eckpunkte lassen sich direkt im Grundriss anfassen und verschieben.</p>
       <button type="button" className="danger" onClick={() => removeShape(shape.id)}>

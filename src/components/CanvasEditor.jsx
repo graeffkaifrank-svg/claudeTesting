@@ -443,13 +443,20 @@ export default function CanvasEditor() {
             rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']}
             boundBoxFunc={(oldBox, newBox) => {
-              // Only enforce the minimum size while actually resizing. A pure
-              // rotation reports the same width/height as before, just a new
-              // angle — applying the floor there used to make thin items
-              // (fences, doors, hedges, ...) impossible to rotate as soon as
-              // their on-screen size dropped under the threshold.
-              const isResize = newBox.width !== oldBox.width || newBox.height !== oldBox.height;
-              if (isResize && (newBox.width < 15 || newBox.height < 15)) return oldBox;
+              // The box here is in on-screen pixels, so a fixed pixel floor
+              // (a) blocks rotation entirely once a thin item's screen size
+              // drops under it, and (b) blocks resizing that thin axis even
+              // further, or — the bug reported here — blocks GROWING the
+              // *other* axis too, because the check didn't distinguish which
+              // axis was actually shrinking. Fix: convert the floor to real
+              // cm (so it no longer depends on current zoom), and only ever
+              // reject an axis that is both shrinking and would end up
+              // under that floor; growing, or an unchanged thin axis, is
+              // always allowed.
+              const minPx = 5 * stageScale; // ~5cm minimum, in current screen pixels
+              const widthShrinking = newBox.width < oldBox.width && newBox.width < minPx;
+              const heightShrinking = newBox.height < oldBox.height && newBox.height < minPx;
+              if (widthShrinking || heightShrinking) return oldBox;
               return newBox;
             }}
             onTransformEnd={(e) => {

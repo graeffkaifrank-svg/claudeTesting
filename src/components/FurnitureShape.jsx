@@ -1,15 +1,5 @@
 import { Group, Rect, Ellipse, Circle, Text, Line, Arc } from 'react-konva';
 
-function hexToRgba(hex, alpha) {
-  const clean = hex.replace('#', '');
-  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
-  const num = parseInt(full, 16);
-  const r = (num >> 16) & 255;
-  const g = (num >> 8) & 255;
-  const b = num & 255;
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
 // Extra symbol drawn on top of the base rectangle for a few furniture
 // types, to make the floor plan read like a real one (door swing, window
 // panes, sink basin, ...).
@@ -76,6 +66,7 @@ export default function FurnitureShape({ item, isSelected, draggable, onSelect, 
       rotation={item.rotation}
       offsetX={item.width / 2}
       offsetY={item.depth / 2}
+      opacity={item.opacity ?? 1}
       draggable={draggable}
       onClick={(e) => {
         e.cancelBubble = true;
@@ -112,7 +103,7 @@ export default function FurnitureShape({ item, isSelected, draggable, onSelect, 
           y={0}
           width={item.width}
           height={item.depth}
-          fill={hexToRgba(item.color, 0.28)}
+          fill={item.color}
           stroke={isSelected ? '#e94560' : item.color}
           strokeWidth={isSelected ? 2.5 : 1.5}
           dash={[10, 6]}
@@ -138,7 +129,7 @@ export default function FurnitureShape({ item, isSelected, draggable, onSelect, 
         height={item.depth}
         align="center"
         verticalAlign="middle"
-        fontSize={Math.min(item.shape === 'zone' ? 16 : 14, item.width / 6, item.depth / 2)}
+        fontSize={item.fontSize ?? Math.min(item.shape === 'zone' ? 16 : 14, item.width / 6, item.depth / 2)}
         fontStyle={item.shape === 'zone' ? 'bold' : 'normal'}
         fill={item.shape === 'zone' ? '#333' : '#1a1a2e'}
         listening={false}

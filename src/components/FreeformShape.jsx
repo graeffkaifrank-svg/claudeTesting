@@ -21,46 +21,48 @@ export default function FreeformShape({ shape, isSelected, draggable, onSelect, 
 
   return (
     <Group>
-      <Line
-        x={0}
-        y={0}
-        points={flatPoints}
-        closed
-        fill={hexToRgba(shape.color, 0.45)}
-        stroke={isSelected ? '#e94560' : shape.color}
-        strokeWidth={isSelected ? 2.5 : 1.5}
-        draggable={draggable}
-        onClick={(e) => {
-          e.cancelBubble = true;
-          onSelect(shape.id);
-        }}
-        onTap={(e) => {
-          e.cancelBubble = true;
-          onSelect(shape.id);
-        }}
-        onDragEnd={(e) => {
-          const node = e.target;
-          const dx = node.x();
-          const dy = node.y();
-          node.position({ x: 0, y: 0 });
-          onDragEnd(shape.id, {
-            points: shape.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
-          });
-        }}
-      />
-      <Text
-        text={shape.label}
-        x={c.x}
-        y={c.y}
-        offsetX={40}
-        offsetY={8}
-        width={80}
-        align="center"
-        fontSize={13}
-        fontStyle="bold"
-        fill="#333"
-        listening={false}
-      />
+      <Group opacity={shape.opacity ?? 1}>
+        <Line
+          x={0}
+          y={0}
+          points={flatPoints}
+          closed
+          fill={hexToRgba(shape.color, 0.45)}
+          stroke={isSelected ? '#e94560' : shape.color}
+          strokeWidth={isSelected ? 2.5 : 1.5}
+          draggable={draggable}
+          onClick={(e) => {
+            e.cancelBubble = true;
+            onSelect(shape.id);
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true;
+            onSelect(shape.id);
+          }}
+          onDragEnd={(e) => {
+            const node = e.target;
+            const dx = node.x();
+            const dy = node.y();
+            node.position({ x: 0, y: 0 });
+            onDragEnd(shape.id, {
+              points: shape.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+            });
+          }}
+        />
+        <Text
+          text={shape.label}
+          x={c.x}
+          y={c.y}
+          offsetX={40}
+          offsetY={8}
+          width={80}
+          align="center"
+          fontSize={shape.fontSize ?? 13}
+          fontStyle="bold"
+          fill="#333"
+          listening={false}
+        />
+      </Group>
       {isSelected &&
         shape.points.map((p, i) => (
           <Circle

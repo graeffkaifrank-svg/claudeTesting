@@ -74,9 +74,9 @@ export const FURNITURE_CATALOG = [
   {
     category: 'Bereiche / Markierungen',
     items: [
-      { type: 'zone-generic', label: 'Bereich (frei)', width: 300, depth: 300, height: 1, color: '#f4a300', shape: 'zone' },
-      { type: 'zone-parking', label: 'Parkplatz', width: 500, depth: 250, height: 1, color: '#4a6fa5', shape: 'zone' },
-      { type: 'zone-play', label: 'Spielbereich', width: 500, depth: 500, height: 1, color: '#e07a5f', shape: 'zone' },
+      { type: 'zone-generic', label: 'Bereich (frei)', width: 300, depth: 300, height: 1, color: '#f4a300', shape: 'zone', opacity: 0.4 },
+      { type: 'zone-parking', label: 'Parkplatz', width: 500, depth: 250, height: 1, color: '#4a6fa5', shape: 'zone', opacity: 0.4 },
+      { type: 'zone-play', label: 'Spielbereich', width: 500, depth: 500, height: 1, color: '#e07a5f', shape: 'zone', opacity: 0.4 },
     ],
   },
 ];
