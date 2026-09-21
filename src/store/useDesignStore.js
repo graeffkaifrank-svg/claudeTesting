@@ -38,11 +38,12 @@ export const useDesignStore = create((set, get) => ({
   selectedId: null,
   selectedKind: null, // 'wall' | 'furniture' | 'shape'
   clipboard: null, // { kind: 'wall' | 'furniture' | 'shape', data: {...} }
+  measureWallIds: [], // up to 2 wall ids picked while tool === 'measure'
   past: [],
   future: [],
   dirty: false,
 
-  setTool: (tool) => set({ tool, selectedId: null, selectedKind: null }),
+  setTool: (tool) => set({ tool, selectedId: null, selectedKind: null, measureWallIds: [] }),
   setWallThickness: (wallThickness) => set({ wallThickness }),
   setSnapToGrid: (snapToGrid) => set({ snapToGrid }),
   setName: (name) => set({ name, dirty: true }),
@@ -50,6 +51,19 @@ export const useDesignStore = create((set, get) => ({
   select: (id, kind) => set({ selectedId: id, selectedKind: kind }),
   clearSelection: () => set({ selectedId: null, selectedKind: null }),
   setClipboard: (clipboard) => set({ clipboard }),
+
+  toggleMeasureWall: (id) => {
+    set((state) => {
+      if (state.measureWallIds.includes(id)) {
+        return { measureWallIds: state.measureWallIds.filter((x) => x !== id) };
+      }
+      if (state.measureWallIds.length >= 2) {
+        return { measureWallIds: [state.measureWallIds[1], id] };
+      }
+      return { measureWallIds: [...state.measureWallIds, id] };
+    });
+  },
+  clearMeasureWalls: () => set({ measureWallIds: [] }),
 
   pushHistory: () => {
     const state = get();
@@ -104,6 +118,7 @@ export const useDesignStore = create((set, get) => ({
       walls: state.walls.filter((w) => w.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
       selectedKind: state.selectedId === id ? null : state.selectedKind,
+      measureWallIds: state.measureWallIds.filter((x) => x !== id),
       dirty: true,
     }));
   },
@@ -253,7 +268,16 @@ export const useDesignStore = create((set, get) => ({
   },
 
   newDesign: () =>
-    set({ ...emptyDesign(), selectedId: null, selectedKind: null, clipboard: null, past: [], future: [], dirty: false }),
+    set({
+      ...emptyDesign(),
+      selectedId: null,
+      selectedKind: null,
+      clipboard: null,
+      measureWallIds: [],
+      past: [],
+      future: [],
+      dirty: false,
+    }),
 
   loadDesign: (data) => {
     const layers = Array.isArray(data.layers) && data.layers.length > 0 ? data.layers : defaultLayers();
@@ -270,6 +294,7 @@ export const useDesignStore = create((set, get) => ({
       selectedId: null,
       selectedKind: null,
       clipboard: null,
+      measureWallIds: [],
       past: [],
       future: [],
       dirty: false,

@@ -108,6 +108,9 @@ export default function Toolbar({ onOpen3D }) {
           <button type="button" className={tool === 'freeform' ? 'active' : ''} onClick={() => setTool('freeform')}>
             ✏️ Freiform zeichnen
           </button>
+          <button type="button" className={tool === 'measure' ? 'active' : ''} onClick={() => setTool('measure')}>
+            📏 Abstand messen
+          </button>
         </div>
 
         {tool === 'wall' && (

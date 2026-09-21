@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
-import { formatLength, cmToMeters } from '../utils/geometry';
+import { formatLength, cmToMeters, wallToWallDistance } from '../utils/geometry';
 
 function NumberField({ label, value, onChange, step = 1, min, max, suffix }) {
   const display = Number.isFinite(value) ? Math.round(value * 100) / 100 : '';
@@ -224,6 +224,43 @@ function ShapeProperties({ shape }) {
   );
 }
 
+function MeasurePanel({ wallAId, wallBId }) {
+  const walls = useDesignStore((s) => s.walls);
+  const updateWall = useDesignStore((s) => s.updateWall);
+  const clearMeasureWalls = useDesignStore((s) => s.clearMeasureWalls);
+  const wallA = walls.find((w) => w.id === wallAId);
+  const wallB = walls.find((w) => w.id === wallBId);
+
+  if (!wallA || !wallB) return <SummaryProperties />;
+
+  const { distance: distCm, dirX, dirY } = wallToWallDistance(wallA, wallB);
+
+  const setDistance = (newLenM) => {
+    const newDistCm = Math.max(1, newLenM * 100);
+    const delta = newDistCm - distCm;
+    updateWall(wallB.id, {
+      x1: wallB.x1 + dirX * delta,
+      y1: wallB.y1 + dirY * delta,
+      x2: wallB.x2 + dirX * delta,
+      y2: wallB.y2 + dirY * delta,
+    });
+  };
+
+  return (
+    <div className="props">
+      <h3>Abstand zwischen Wänden</h3>
+      <NumberField label="Abstand" value={cmToMeters(distCm)} step={0.05} min={0.01} suffix="m" onChange={setDistance} />
+      <p className="props-empty-hint">
+        Ändert die Position der zweiten gewählten Wand, parallel zur ersten. Zum Neuwählen auf eine freie Fläche
+        klicken.
+      </p>
+      <button type="button" onClick={clearMeasureWalls}>
+        Auswahl zurücksetzen
+      </button>
+    </div>
+  );
+}
+
 function SummaryProperties() {
   const walls = useDesignStore((s) => s.walls);
   const furniture = useDesignStore((s) => s.furniture);
@@ -257,9 +294,13 @@ export default function PropertiesPanel() {
   const walls = useDesignStore((s) => s.walls);
   const furniture = useDesignStore((s) => s.furniture);
   const shapes = useDesignStore((s) => s.shapes);
+  const tool = useDesignStore((s) => s.tool);
+  const measureWallIds = useDesignStore((s) => s.measureWallIds);
 
   let content;
-  if (selectedKind === 'wall') {
+  if (tool === 'measure' && measureWallIds.length === 2) {
+    content = <MeasurePanel wallAId={measureWallIds[0]} wallBId={measureWallIds[1]} />;
+  } else if (selectedKind === 'wall') {
     const wall = walls.find((w) => w.id === selectedId);
     content = wall ? <WallProperties wall={wall} /> : <SummaryProperties />;
   } else if (selectedKind === 'furniture') {

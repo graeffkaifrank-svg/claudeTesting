@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Stage, Layer, Line, Transformer } from 'react-konva';
+import { Stage, Layer, Line, Circle, Text, Transformer } from 'react-konva';
 import { useDesignStore, GRID_SIZE } from '../store/useDesignStore';
-import { snapAngle, snapValue } from '../utils/geometry';
+import { snapAngle, snapValue, wallToWallDistance, formatLength } from '../utils/geometry';
 import { FURNITURE_BY_TYPE, SHAPE_PRESETS, rectPoints } from '../data/furnitureCatalog';
 import WallShape from './WallShape';
 import FurnitureShape from './FurnitureShape';
@@ -95,6 +95,9 @@ export default function CanvasEditor() {
   const wallThickness = useDesignStore((s) => s.wallThickness);
   const selectedId = useDesignStore((s) => s.selectedId);
   const selectedKind = useDesignStore((s) => s.selectedKind);
+  const measureWallIds = useDesignStore((s) => s.measureWallIds);
+  const toggleMeasureWall = useDesignStore((s) => s.toggleMeasureWall);
+  const clearMeasureWalls = useDesignStore((s) => s.clearMeasureWalls);
   const select = useDesignStore((s) => s.select);
   const clearSelection = useDesignStore((s) => s.clearSelection);
   const addWall = useDesignStore((s) => s.addWall);
@@ -229,9 +232,12 @@ export default function CanvasEditor() {
         return;
       }
 
-      if (clickedOnEmpty) clearSelection();
+      if (clickedOnEmpty) {
+        if (tool === 'measure') clearMeasureWalls();
+        else clearSelection();
+      }
     },
-    [tool, wallStart, wallThickness, computeSnappedPoint, addWall, clearSelection]
+    [tool, wallStart, wallThickness, computeSnappedPoint, addWall, clearSelection, clearMeasureWalls]
   );
 
   const handleStageMouseMove = useCallback(() => {
@@ -353,6 +359,19 @@ export default function CanvasEditor() {
     return pts;
   }, [freeformPoints, previewPoint]);
 
+  // While the "measure" tool has two walls picked, draw a dimension line
+  // from a wall's own midpoint straight over to the other wall's line, so
+  // the gap between two (roughly parallel) walls is visible at a glance.
+  const measureLine = useMemo(() => {
+    if (tool !== 'measure' || measureWallIds.length !== 2) return null;
+    const wallA = walls.find((w) => w.id === measureWallIds[0]);
+    const wallB = walls.find((w) => w.id === measureWallIds[1]);
+    if (!wallA || !wallB) return null;
+    const midA = { x: (wallA.x1 + wallA.x2) / 2, y: (wallA.y1 + wallA.y2) / 2 };
+    const { distance: dist, foot } = wallToWallDistance(wallA, wallB);
+    return { points: [midA.x, midA.y, foot.x, foot.y], distance: dist, wallAId: wallA.id, wallBId: wallB.id };
+  }, [tool, measureWallIds, walls]);
+
   return (
     <div ref={containerRef} className="canvas-wrap" onDragOver={handleDragOver} onDrop={handleDrop}>
       <Stage
@@ -371,7 +390,7 @@ export default function CanvasEditor() {
         onDragEnd={(e) => {
           if (e.target === stageRef.current) setStagePos({ x: e.target.x(), y: e.target.y() });
         }}
-        style={{ cursor: tool === 'wall' ? 'crosshair' : 'default' }}
+        style={{ cursor: tool === 'wall' || tool === 'measure' ? 'crosshair' : 'default' }}
       >
         <Layer listening={false}>
           <GridLines width={size.width} height={size.height} stageScale={stageScale} stagePos={stagePos} />
@@ -408,9 +427,11 @@ export default function CanvasEditor() {
             <WallShape
               key={w.id}
               wall={w}
-              isSelected={selectedId === w.id && selectedKind === 'wall'}
+              isSelected={
+                tool === 'measure' ? measureWallIds.includes(w.id) : selectedId === w.id && selectedKind === 'wall'
+              }
               draggable={tool === 'select'}
-              onSelect={(id) => select(id, 'wall')}
+              onSelect={(id) => (tool === 'measure' ? toggleMeasureWall(id) : select(id, 'wall'))}
               onDragEnd={(id, patch) => updateWall(id, patch)}
               onEndpointDragEnd={(id, patch) => updateWall(id, patch)}
               snap={snapFn}
@@ -418,6 +439,24 @@ export default function CanvasEditor() {
           ))}
           {previewLinePoints && (
             <Line points={previewLinePoints} stroke="#e94560" strokeWidth={wallThickness} dash={[10, 6]} opacity={0.7} />
+          )}
+          {measureLine && (
+            <>
+              <Line points={measureLine.points} stroke="#0a7d4a" strokeWidth={2} dash={[6, 4]} />
+              <Circle x={measureLine.points[0]} y={measureLine.points[1]} radius={4} fill="#0a7d4a" />
+              <Circle x={measureLine.points[2]} y={measureLine.points[3]} radius={4} fill="#0a7d4a" />
+              <Text
+                text={formatLength(measureLine.distance)}
+                x={(measureLine.points[0] + measureLine.points[2]) / 2}
+                y={(measureLine.points[1] + measureLine.points[3]) / 2}
+                fontSize={13}
+                fontStyle="bold"
+                fill="#0a7d4a"
+                offsetX={20}
+                offsetY={18}
+                padding={2}
+              />
+            </>
           )}
         </Layer>
 
@@ -488,6 +527,10 @@ export default function CanvasEditor() {
             ? 'Klicken für weitere Ecken · Rechtsklick/Enter zum Schließen · Esc zum Abbrechen'
             : 'Klicken zum Start einer Freiformfläche')}
         {tool === 'select' && 'Ziehen zum Verschieben · Entf zum Löschen · Strg+C/V zum Kopieren · Mausrad zum Zoomen'}
+        {tool === 'measure' &&
+          (measureWallIds.length < 2
+            ? `Zwei Wände anklicken, um den Abstand zu messen (${measureWallIds.length}/2 gewählt)`
+            : 'Abstand rechts bearbeiten · Klick auf freie Fläche zum Zurücksetzen')}
       </div>
     </div>
   );
