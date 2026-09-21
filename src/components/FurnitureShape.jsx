@@ -87,42 +87,47 @@ export default function FurnitureShape({ item, isSelected, draggable, onSelect, 
         onDragEnd(item.id, { x: node.x(), y: node.y() });
       }}
     >
-      {item.shape === 'circle' ? (
-        <Ellipse
-          x={item.width / 2}
-          y={item.depth / 2}
-          radiusX={item.width / 2}
-          radiusY={item.depth / 2}
-          fill={item.color}
-          stroke={isSelected ? '#e94560' : '#33333366'}
-          strokeWidth={isSelected ? 2.5 : 1}
-        />
-      ) : item.shape === 'zone' ? (
-        <Rect
-          x={0}
-          y={0}
-          width={item.width}
-          height={item.depth}
-          fill={item.color}
-          stroke={isSelected ? '#e94560' : item.color}
-          strokeWidth={isSelected ? 2.5 : 1.5}
-          dash={[10, 6]}
-        />
-      ) : (
-        <Rect
-          x={0}
-          y={0}
-          width={item.width}
-          height={item.depth}
-          fill={item.color}
-          stroke={isSelected ? '#e94560' : '#33333366'}
-          strokeWidth={isSelected ? 2.5 : 1}
-          cornerRadius={Math.min(6, item.width * 0.05, item.depth * 0.05)}
-          offsetX={0}
-          offsetY={0}
-        />
-      )}
-      <Decoration item={item} />
+      {/* Mirrors only the base shape + decoration (e.g. a door's swing arc)
+          around the item's own center, leaving the label text below
+          unflipped so it stays readable. */}
+      <Group x={item.flipped ? item.width : 0} scaleX={item.flipped ? -1 : 1}>
+        {item.shape === 'circle' ? (
+          <Ellipse
+            x={item.width / 2}
+            y={item.depth / 2}
+            radiusX={item.width / 2}
+            radiusY={item.depth / 2}
+            fill={item.color}
+            stroke={isSelected ? '#e94560' : '#33333366'}
+            strokeWidth={isSelected ? 2.5 : 1}
+          />
+        ) : item.shape === 'zone' ? (
+          <Rect
+            x={0}
+            y={0}
+            width={item.width}
+            height={item.depth}
+            fill={item.color}
+            stroke={isSelected ? '#e94560' : item.color}
+            strokeWidth={isSelected ? 2.5 : 1.5}
+            dash={[10, 6]}
+          />
+        ) : (
+          <Rect
+            x={0}
+            y={0}
+            width={item.width}
+            height={item.depth}
+            fill={item.color}
+            stroke={isSelected ? '#e94560' : '#33333366'}
+            strokeWidth={isSelected ? 2.5 : 1}
+            cornerRadius={Math.min(6, item.width * 0.05, item.depth * 0.05)}
+            offsetX={0}
+            offsetY={0}
+          />
+        )}
+        <Decoration item={item} />
+      </Group>
       <Text
         text={item.label}
         width={item.width}

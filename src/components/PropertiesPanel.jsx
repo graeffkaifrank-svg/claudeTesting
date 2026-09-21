@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
-import { formatLength, cmToMeters, wallToWallDistance } from '../utils/geometry';
+import { formatLength, cmToMeters, elementDistance } from '../utils/geometry';
 
 function NumberField({ label, value, onChange, step = 1, min, max, suffix }) {
   const display = Number.isFinite(value) ? Math.round(value * 100) / 100 : '';
@@ -132,6 +132,14 @@ function FurnitureProperties({ item }) {
         onChange={(v) => updateFurniture(item.id, { rotation: v % 360 })}
         suffix="°"
       />
+      <button
+        type="button"
+        className={item.flipped ? 'active' : ''}
+        onClick={() => updateFurniture(item.id, { flipped: !item.flipped })}
+        title="Spiegelt das Objekt, z. B. für einen Türanschlag in die andere Richtung"
+      >
+        ↔ {item.flipped ? 'Gespiegelt' : 'Spiegeln'}
+      </button>
       <label className="prop-field">
         <span>Farbe</span>
         <input
@@ -224,37 +232,56 @@ function ShapeProperties({ shape }) {
   );
 }
 
-function MeasurePanel({ wallAId, wallBId }) {
+const KIND_LABEL = { wall: 'Wand', furniture: 'Objekt', shape: 'Fläche' };
+
+function MeasurePanel({ pickA, pickB }) {
   const walls = useDesignStore((s) => s.walls);
+  const furniture = useDesignStore((s) => s.furniture);
+  const shapes = useDesignStore((s) => s.shapes);
   const updateWall = useDesignStore((s) => s.updateWall);
-  const clearMeasureWalls = useDesignStore((s) => s.clearMeasureWalls);
-  const wallA = walls.find((w) => w.id === wallAId);
-  const wallB = walls.find((w) => w.id === wallBId);
+  const updateFurniture = useDesignStore((s) => s.updateFurniture);
+  const updateShape = useDesignStore((s) => s.updateShape);
+  const clearMeasureElements = useDesignStore((s) => s.clearMeasureElements);
 
-  if (!wallA || !wallB) return <SummaryProperties />;
+  const findByKind = (id, kind) =>
+    kind === 'wall' ? walls.find((w) => w.id === id) : kind === 'furniture' ? furniture.find((f) => f.id === id) : shapes.find((s) => s.id === id);
 
-  const { distance: distCm, dirX, dirY } = wallToWallDistance(wallA, wallB);
+  const elA = findByKind(pickA.id, pickA.kind);
+  const elB = findByKind(pickB.id, pickB.kind);
 
+  if (!elA || !elB) return <SummaryProperties />;
+
+  const { distance: distCm, dirX, dirY } = elementDistance(elA, pickA.kind, elB, pickB.kind);
+
+  // Moves the second picked element along the connecting direction so the
+  // gap becomes exactly the typed value — a lightweight stand-in for a real
+  // distance constraint: it sets the distance once rather than keeping it
+  // locked as either element moves afterwards.
   const setDistance = (newLenM) => {
-    const newDistCm = Math.max(1, newLenM * 100);
+    const newDistCm = Math.max(0, newLenM * 100);
     const delta = newDistCm - distCm;
-    updateWall(wallB.id, {
-      x1: wallB.x1 + dirX * delta,
-      y1: wallB.y1 + dirY * delta,
-      x2: wallB.x2 + dirX * delta,
-      y2: wallB.y2 + dirY * delta,
-    });
+    const dx = dirX * delta;
+    const dy = dirY * delta;
+    if (pickB.kind === 'wall') {
+      updateWall(elB.id, { x1: elB.x1 + dx, y1: elB.y1 + dy, x2: elB.x2 + dx, y2: elB.y2 + dy });
+    } else if (pickB.kind === 'furniture') {
+      updateFurniture(elB.id, { x: elB.x + dx, y: elB.y + dy });
+    } else {
+      updateShape(elB.id, { points: elB.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) });
+    }
   };
 
   return (
     <div className="props">
-      <h3>Abstand zwischen Wänden</h3>
-      <NumberField label="Abstand" value={cmToMeters(distCm)} step={0.05} min={0.01} suffix="m" onChange={setDistance} />
+      <h3>
+        Abstand: {KIND_LABEL[pickA.kind]} ↔ {KIND_LABEL[pickB.kind]}
+      </h3>
+      <NumberField label="Abstand" value={cmToMeters(distCm)} step={0.05} min={0} suffix="m" onChange={setDistance} />
       <p className="props-empty-hint">
-        Ändert die Position der zweiten gewählten Wand, parallel zur ersten. Zum Neuwählen auf eine freie Fläche
-        klicken.
+        Verschiebt das zweite gewählte Element auf den eingegebenen Abstand zum ersten. Zum Neuwählen auf eine freie
+        Fläche klicken.
       </p>
-      <button type="button" onClick={clearMeasureWalls}>
+      <button type="button" onClick={clearMeasureElements}>
         Auswahl zurücksetzen
       </button>
     </div>
@@ -295,11 +322,11 @@ export default function PropertiesPanel() {
   const furniture = useDesignStore((s) => s.furniture);
   const shapes = useDesignStore((s) => s.shapes);
   const tool = useDesignStore((s) => s.tool);
-  const measureWallIds = useDesignStore((s) => s.measureWallIds);
+  const measureIds = useDesignStore((s) => s.measureIds);
 
   let content;
-  if (tool === 'measure' && measureWallIds.length === 2) {
-    content = <MeasurePanel wallAId={measureWallIds[0]} wallBId={measureWallIds[1]} />;
+  if (tool === 'measure' && measureIds.length === 2) {
+    content = <MeasurePanel pickA={measureIds[0]} pickB={measureIds[1]} />;
   } else if (selectedKind === 'wall') {
     const wall = walls.find((w) => w.id === selectedId);
     content = wall ? <WallProperties wall={wall} /> : <SummaryProperties />;

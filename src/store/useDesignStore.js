@@ -38,12 +38,12 @@ export const useDesignStore = create((set, get) => ({
   selectedId: null,
   selectedKind: null, // 'wall' | 'furniture' | 'shape'
   clipboard: null, // { kind: 'wall' | 'furniture' | 'shape', data: {...} }
-  measureWallIds: [], // up to 2 wall ids picked while tool === 'measure'
+  measureIds: [], // up to 2 { id, kind } picks while tool === 'measure'
   past: [],
   future: [],
   dirty: false,
 
-  setTool: (tool) => set({ tool, selectedId: null, selectedKind: null, measureWallIds: [] }),
+  setTool: (tool) => set({ tool, selectedId: null, selectedKind: null, measureIds: [] }),
   setWallThickness: (wallThickness) => set({ wallThickness }),
   setSnapToGrid: (snapToGrid) => set({ snapToGrid }),
   setName: (name) => set({ name, dirty: true }),
@@ -52,18 +52,21 @@ export const useDesignStore = create((set, get) => ({
   clearSelection: () => set({ selectedId: null, selectedKind: null }),
   setClipboard: (clipboard) => set({ clipboard }),
 
-  toggleMeasureWall: (id) => {
+  // Elements can be walls, furniture or freeform shapes — kind disambiguates
+  // ids that only need to be unique within their own array.
+  toggleMeasureElement: (id, kind) => {
     set((state) => {
-      if (state.measureWallIds.includes(id)) {
-        return { measureWallIds: state.measureWallIds.filter((x) => x !== id) };
+      const isPicked = (m) => m.id === id && m.kind === kind;
+      if (state.measureIds.some(isPicked)) {
+        return { measureIds: state.measureIds.filter((m) => !isPicked(m)) };
       }
-      if (state.measureWallIds.length >= 2) {
-        return { measureWallIds: [state.measureWallIds[1], id] };
+      if (state.measureIds.length >= 2) {
+        return { measureIds: [state.measureIds[1], { id, kind }] };
       }
-      return { measureWallIds: [...state.measureWallIds, id] };
+      return { measureIds: [...state.measureIds, { id, kind }] };
     });
   },
-  clearMeasureWalls: () => set({ measureWallIds: [] }),
+  clearMeasureElements: () => set({ measureIds: [] }),
 
   pushHistory: () => {
     const state = get();
@@ -118,7 +121,7 @@ export const useDesignStore = create((set, get) => ({
       walls: state.walls.filter((w) => w.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
       selectedKind: state.selectedId === id ? null : state.selectedKind,
-      measureWallIds: state.measureWallIds.filter((x) => x !== id),
+      measureIds: state.measureIds.filter((m) => !(m.id === id && m.kind === 'wall')),
       dirty: true,
     }));
   },
@@ -147,6 +150,7 @@ export const useDesignStore = create((set, get) => ({
       furniture: state.furniture.filter((f) => f.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
       selectedKind: state.selectedId === id ? null : state.selectedKind,
+      measureIds: state.measureIds.filter((m) => !(m.id === id && m.kind === 'furniture')),
       dirty: true,
     }));
   },
@@ -178,6 +182,7 @@ export const useDesignStore = create((set, get) => ({
       shapes: state.shapes.filter((s) => s.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
       selectedKind: state.selectedId === id ? null : state.selectedKind,
+      measureIds: state.measureIds.filter((m) => !(m.id === id && m.kind === 'shape')),
       dirty: true,
     }));
   },
@@ -273,7 +278,7 @@ export const useDesignStore = create((set, get) => ({
       selectedId: null,
       selectedKind: null,
       clipboard: null,
-      measureWallIds: [],
+      measureIds: [],
       past: [],
       future: [],
       dirty: false,
@@ -294,7 +299,7 @@ export const useDesignStore = create((set, get) => ({
       selectedId: null,
       selectedKind: null,
       clipboard: null,
-      measureWallIds: [],
+      measureIds: [],
       past: [],
       future: [],
       dirty: false,

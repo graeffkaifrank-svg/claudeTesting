@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Line, Circle, Text, Transformer } from 'react-konva';
 import { useDesignStore, GRID_SIZE } from '../store/useDesignStore';
-import { snapAngle, snapValue, wallToWallDistance, formatLength } from '../utils/geometry';
+import { snapAngle, snapValue, elementDistance, formatLength } from '../utils/geometry';
 import { FURNITURE_BY_TYPE, SHAPE_PRESETS, rectPoints } from '../data/furnitureCatalog';
 import WallShape from './WallShape';
 import FurnitureShape from './FurnitureShape';
@@ -95,9 +95,9 @@ export default function CanvasEditor() {
   const wallThickness = useDesignStore((s) => s.wallThickness);
   const selectedId = useDesignStore((s) => s.selectedId);
   const selectedKind = useDesignStore((s) => s.selectedKind);
-  const measureWallIds = useDesignStore((s) => s.measureWallIds);
-  const toggleMeasureWall = useDesignStore((s) => s.toggleMeasureWall);
-  const clearMeasureWalls = useDesignStore((s) => s.clearMeasureWalls);
+  const measureIds = useDesignStore((s) => s.measureIds);
+  const toggleMeasureElement = useDesignStore((s) => s.toggleMeasureElement);
+  const clearMeasureElements = useDesignStore((s) => s.clearMeasureElements);
   const select = useDesignStore((s) => s.select);
   const clearSelection = useDesignStore((s) => s.clearSelection);
   const addWall = useDesignStore((s) => s.addWall);
@@ -233,11 +233,11 @@ export default function CanvasEditor() {
       }
 
       if (clickedOnEmpty) {
-        if (tool === 'measure') clearMeasureWalls();
+        if (tool === 'measure') clearMeasureElements();
         else clearSelection();
       }
     },
-    [tool, wallStart, wallThickness, computeSnappedPoint, addWall, clearSelection, clearMeasureWalls]
+    [tool, wallStart, wallThickness, computeSnappedPoint, addWall, clearSelection, clearMeasureElements]
   );
 
   const handleStageMouseMove = useCallback(() => {
@@ -359,18 +359,24 @@ export default function CanvasEditor() {
     return pts;
   }, [freeformPoints, previewPoint]);
 
-  // While the "measure" tool has two walls picked, draw a dimension line
-  // from a wall's own midpoint straight over to the other wall's line, so
-  // the gap between two (roughly parallel) walls is visible at a glance.
+  const findByKind = useCallback(
+    (id, kind) =>
+      kind === 'wall' ? walls.find((w) => w.id === id) : kind === 'furniture' ? furniture.find((f) => f.id === id) : shapes.find((s) => s.id === id),
+    [walls, furniture, shapes]
+  );
+
+  // While the "measure" tool has two elements picked (walls, furniture or
+  // shapes, in any combination), draw a dimension line between their
+  // closest points, so the gap between them is visible at a glance.
   const measureLine = useMemo(() => {
-    if (tool !== 'measure' || measureWallIds.length !== 2) return null;
-    const wallA = walls.find((w) => w.id === measureWallIds[0]);
-    const wallB = walls.find((w) => w.id === measureWallIds[1]);
-    if (!wallA || !wallB) return null;
-    const midA = { x: (wallA.x1 + wallA.x2) / 2, y: (wallA.y1 + wallA.y2) / 2 };
-    const { distance: dist, foot } = wallToWallDistance(wallA, wallB);
-    return { points: [midA.x, midA.y, foot.x, foot.y], distance: dist, wallAId: wallA.id, wallBId: wallB.id };
-  }, [tool, measureWallIds, walls]);
+    if (tool !== 'measure' || measureIds.length !== 2) return null;
+    const [pickA, pickB] = measureIds;
+    const elA = findByKind(pickA.id, pickA.kind);
+    const elB = findByKind(pickB.id, pickB.kind);
+    if (!elA || !elB) return null;
+    const { distance: dist, pointA, pointB } = elementDistance(elA, pickA.kind, elB, pickB.kind);
+    return { points: [pointA.x, pointA.y, pointB.x, pointB.y], distance: dist };
+  }, [tool, measureIds, findByKind]);
 
   return (
     <div ref={containerRef} className="canvas-wrap" onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -401,9 +407,13 @@ export default function CanvasEditor() {
             <FreeformShape
               key={shape.id}
               shape={shape}
-              isSelected={selectedId === shape.id && selectedKind === 'shape'}
+              isSelected={
+                tool === 'measure'
+                  ? measureIds.some((m) => m.id === shape.id && m.kind === 'shape')
+                  : selectedId === shape.id && selectedKind === 'shape'
+              }
               draggable={tool === 'select'}
-              onSelect={(id) => select(id, 'shape')}
+              onSelect={(id) => (tool === 'measure' ? toggleMeasureElement(id, 'shape') : select(id, 'shape'))}
               onDragEnd={(id, patch) => updateShape(id, patch)}
               onPointDragEnd={(id, patch) => updateShape(id, patch)}
               snap={snapFn}
@@ -428,10 +438,12 @@ export default function CanvasEditor() {
               key={w.id}
               wall={w}
               isSelected={
-                tool === 'measure' ? measureWallIds.includes(w.id) : selectedId === w.id && selectedKind === 'wall'
+                tool === 'measure'
+                  ? measureIds.some((m) => m.id === w.id && m.kind === 'wall')
+                  : selectedId === w.id && selectedKind === 'wall'
               }
               draggable={tool === 'select'}
-              onSelect={(id) => (tool === 'measure' ? toggleMeasureWall(id) : select(id, 'wall'))}
+              onSelect={(id) => (tool === 'measure' ? toggleMeasureElement(id, 'wall') : select(id, 'wall'))}
               onDragEnd={(id, patch) => updateWall(id, patch)}
               onEndpointDragEnd={(id, patch) => updateWall(id, patch)}
               snap={snapFn}
@@ -465,9 +477,13 @@ export default function CanvasEditor() {
             <FurnitureShape
               key={item.id}
               item={item}
-              isSelected={selectedId === item.id && selectedKind === 'furniture'}
+              isSelected={
+                tool === 'measure'
+                  ? measureIds.some((m) => m.id === item.id && m.kind === 'furniture')
+                  : selectedId === item.id && selectedKind === 'furniture'
+              }
               draggable={tool === 'select'}
-              onSelect={(id) => select(id, 'furniture')}
+              onSelect={(id) => (tool === 'measure' ? toggleMeasureElement(id, 'furniture') : select(id, 'furniture'))}
               onDragEnd={(id, patch) => updateFurniture(id, patch)}
               snap={snapFn}
               shapeRef={(node) => {
@@ -528,8 +544,8 @@ export default function CanvasEditor() {
             : 'Klicken zum Start einer Freiformfläche')}
         {tool === 'select' && 'Ziehen zum Verschieben · Entf zum Löschen · Strg+C/V zum Kopieren · Mausrad zum Zoomen'}
         {tool === 'measure' &&
-          (measureWallIds.length < 2
-            ? `Zwei Wände anklicken, um den Abstand zu messen (${measureWallIds.length}/2 gewählt)`
+          (measureIds.length < 2
+            ? `Zwei Elemente anklicken (Wände, Möbel oder Flächen), um den Abstand zu messen (${measureIds.length}/2 gewählt)`
             : 'Abstand rechts bearbeiten · Klick auf freie Fläche zum Zurücksetzen')}
       </div>
     </div>
