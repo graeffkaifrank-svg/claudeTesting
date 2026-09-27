@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
-import { formatLength, cmToMeters, elementDistance } from '../utils/geometry';
+import { formatLength, elementDistance } from '../utils/geometry';
 
 function NumberField({ label, value, onChange, step = 1, min, max, suffix }) {
   const display = Number.isFinite(value) ? Math.round(value * 100) / 100 : '';
@@ -66,8 +66,8 @@ function WallProperties({ wall }) {
   const length = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
   const angle = Math.atan2(wall.y2 - wall.y1, wall.x2 - wall.x1);
 
-  const setLength = (newLenM) => {
-    const newLen = Math.max(10, newLenM * 100);
+  const setLength = (newLenCm) => {
+    const newLen = Math.max(10, newLenCm);
     updateWall(wall.id, {
       x2: wall.x1 + Math.cos(angle) * newLen,
       y2: wall.y1 + Math.sin(angle) * newLen,
@@ -77,7 +77,7 @@ function WallProperties({ wall }) {
   return (
     <div className="props">
       <h3>Wand</h3>
-      <NumberField label="Länge" value={cmToMeters(length)} step={0.05} min={0.1} suffix="m" onChange={setLength} />
+      <NumberField label="Länge" value={Math.round(length)} step={1} min={10} suffix="cm" onChange={setLength} />
       <NumberField
         label="Stärke"
         value={wall.thickness}
@@ -257,8 +257,8 @@ function MeasurePanel({ pickA, pickB }) {
   // gap becomes exactly the typed value — a lightweight stand-in for a real
   // distance constraint: it sets the distance once rather than keeping it
   // locked as either element moves afterwards.
-  const setDistance = (newLenM) => {
-    const newDistCm = Math.max(0, newLenM * 100);
+  const setDistance = (newLenCm) => {
+    const newDistCm = Math.max(0, newLenCm);
     const delta = newDistCm - distCm;
     const dx = dirX * delta;
     const dy = dirY * delta;
@@ -276,7 +276,7 @@ function MeasurePanel({ pickA, pickB }) {
       <h3>
         Abstand: {KIND_LABEL[pickA.kind]} ↔ {KIND_LABEL[pickB.kind]}
       </h3>
-      <NumberField label="Abstand" value={cmToMeters(distCm)} step={0.05} min={0} suffix="m" onChange={setDistance} />
+      <NumberField label="Abstand" value={Math.round(distCm)} step={1} min={0} suffix="cm" onChange={setDistance} />
       <p className="props-empty-hint">
         Verschiebt das zweite gewählte Element auf den eingegebenen Abstand zum ersten. Zum Neuwählen auf eine freie
         Fläche klicken.
@@ -315,9 +315,46 @@ function SummaryProperties() {
   );
 }
 
+function MultiSelectionProperties({ selection }) {
+  const removeSelected = useDesignStore((s) => s.removeSelected);
+  const copySelected = useDesignStore((s) => s.copySelected);
+  const counts = selection.reduce((acc, s) => ({ ...acc, [s.kind]: (acc[s.kind] ?? 0) + 1 }), {});
+
+  return (
+    <div className="props">
+      <h3>{selection.length} Elemente ausgewählt</h3>
+      {counts.wall > 0 && (
+        <p className="prop-summary-line">
+          <strong>{counts.wall}</strong> Wände
+        </p>
+      )}
+      {counts.furniture > 0 && (
+        <p className="prop-summary-line">
+          <strong>{counts.furniture}</strong> Möbelstücke
+        </p>
+      )}
+      {counts.shape > 0 && (
+        <p className="prop-summary-line">
+          <strong>{counts.shape}</strong> Freiformflächen
+        </p>
+      )}
+      <p className="props-empty-hint">
+        Ziehen bewegt die ganze Auswahl gemeinsam. Shift+Klick fügt Elemente hinzu oder entfernt sie.
+      </p>
+      <button type="button" onClick={copySelected} title="Kopieren (Strg+C)">
+        📋 Kopieren
+      </button>
+      <button type="button" className="danger" onClick={removeSelected}>
+        Auswahl löschen
+      </button>
+    </div>
+  );
+}
+
 export default function PropertiesPanel() {
   const selectedId = useDesignStore((s) => s.selectedId);
   const selectedKind = useDesignStore((s) => s.selectedKind);
+  const selection = useDesignStore((s) => s.selection);
   const walls = useDesignStore((s) => s.walls);
   const furniture = useDesignStore((s) => s.furniture);
   const shapes = useDesignStore((s) => s.shapes);
@@ -327,6 +364,8 @@ export default function PropertiesPanel() {
   let content;
   if (tool === 'measure' && measureIds.length === 2) {
     content = <MeasurePanel pickA={measureIds[0]} pickB={measureIds[1]} />;
+  } else if (selection.length > 1) {
+    content = <MultiSelectionProperties selection={selection} />;
   } else if (selectedKind === 'wall') {
     const wall = walls.find((w) => w.id === selectedId);
     content = wall ? <WallProperties wall={wall} /> : <SummaryProperties />;

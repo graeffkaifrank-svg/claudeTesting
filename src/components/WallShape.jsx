@@ -1,7 +1,7 @@
 import { Circle, Group, Line, Text } from 'react-konva';
 import { formatLength } from '../utils/geometry';
 
-export default function WallShape({ wall, isSelected, draggable, onSelect, onDragEnd, onEndpointDragEnd, snap }) {
+export default function WallShape({ wall, isSelected, draggable, onSelect, onDragEnd, onEndpointDragEnd, snapPoint }) {
   const { x1, y1, x2, y2, thickness } = wall;
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
@@ -20,11 +20,11 @@ export default function WallShape({ wall, isSelected, draggable, onSelect, onDra
         draggable={draggable}
         onClick={(e) => {
           e.cancelBubble = true;
-          onSelect(wall.id);
+          onSelect(wall.id, e.evt.shiftKey);
         }}
         onTap={(e) => {
           e.cancelBubble = true;
-          onSelect(wall.id);
+          onSelect(wall.id, e.evt.shiftKey);
         }}
         onDragEnd={(e) => {
           const node = e.target;
@@ -63,9 +63,9 @@ export default function WallShape({ wall, isSelected, draggable, onSelect, onDra
             strokeWidth={1.5}
             draggable
             onDragMove={(e) => {
-              if (!snap) return;
+              if (!snapPoint) return;
               const node = e.target;
-              node.position({ x: snap(node.x()), y: snap(node.y()) });
+              node.position(snapPoint({ x: node.x(), y: node.y() }));
             }}
             onDragEnd={(e) => {
               onEndpointDragEnd(wall.id, { x1: e.target.x(), y1: e.target.y() });
@@ -80,9 +80,9 @@ export default function WallShape({ wall, isSelected, draggable, onSelect, onDra
             strokeWidth={1.5}
             draggable
             onDragMove={(e) => {
-              if (!snap) return;
+              if (!snapPoint) return;
               const node = e.target;
-              node.position({ x: snap(node.x()), y: snap(node.y()) });
+              node.position(snapPoint({ x: node.x(), y: node.y() }));
             }}
             onDragEnd={(e) => {
               onEndpointDragEnd(wall.id, { x2: e.target.x(), y2: e.target.y() });

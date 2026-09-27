@@ -57,7 +57,7 @@ function Decoration({ item }) {
   }
 }
 
-export default function FurnitureShape({ item, isSelected, draggable, onSelect, onDragEnd, shapeRef, snap }) {
+export default function FurnitureShape({ item, isSelected, draggable, onSelect, onDragEnd, shapeRef, snapDrag }) {
   return (
     <Group
       ref={shapeRef}
@@ -70,21 +70,24 @@ export default function FurnitureShape({ item, isSelected, draggable, onSelect, 
       draggable={draggable}
       onClick={(e) => {
         e.cancelBubble = true;
-        onSelect(item.id);
+        onSelect(item.id, e.evt.shiftKey);
       }}
       onTap={(e) => {
         e.cancelBubble = true;
-        onSelect(item.id);
+        onSelect(item.id, e.evt.shiftKey);
       }}
       onDragMove={(e) => {
-        if (!snap) return;
-        // live-snap the group's absolute position while dragging
+        if (!snapDrag) return;
+        // live-snap the group's absolute position (and, near a wall, its
+        // rotation too) while dragging
         const node = e.target;
-        node.position({ x: snap(node.x()), y: snap(node.y()) });
+        const snapped = snapDrag(node.x(), node.y());
+        node.position({ x: snapped.x, y: snapped.y });
+        if (snapped.rotation !== undefined) node.rotation(snapped.rotation);
       }}
       onDragEnd={(e) => {
         const node = e.target;
-        onDragEnd(item.id, { x: node.x(), y: node.y() });
+        onDragEnd(item.id, { x: node.x(), y: node.y(), rotation: node.rotation() });
       }}
     >
       {/* Mirrors only the base shape + decoration (e.g. a door's swing arc)

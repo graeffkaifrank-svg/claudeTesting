@@ -25,7 +25,7 @@ export default function Toolbar({ onOpen3D }) {
   const past = useDesignStore((s) => s.past);
   const future = useDesignStore((s) => s.future);
   const removeSelected = useDesignStore((s) => s.removeSelected);
-  const selectedId = useDesignStore((s) => s.selectedId);
+  const selection = useDesignStore((s) => s.selection);
   const copySelected = useDesignStore((s) => s.copySelected);
   const pasteClipboard = useDesignStore((s) => s.pasteClipboard);
   const clipboard = useDesignStore((s) => s.clipboard);
@@ -83,8 +83,8 @@ export default function Toolbar({ onOpen3D }) {
         </div>
 
         <div className="toolbar-group">
-          <button type="button" onClick={copySelected} disabled={!selectedId} title="Kopieren (Strg+C)">📋 Kopieren</button>
-          <button type="button" onClick={pasteClipboard} disabled={!clipboard} title="Einfügen (Strg+V)">📌 Einfügen</button>
+          <button type="button" onClick={copySelected} disabled={selection.length === 0} title="Kopieren (Strg+C)">📋 Kopieren</button>
+          <button type="button" onClick={pasteClipboard} disabled={!clipboard || clipboard.length === 0} title="Einfügen (Strg+V)">📌 Einfügen</button>
         </div>
 
         <div className="toolbar-group" style={{ position: 'relative' }}>
@@ -133,7 +133,7 @@ export default function Toolbar({ onOpen3D }) {
           Am Raster einrasten
         </label>
 
-        <button type="button" onClick={removeSelected} disabled={!selectedId} title="Auswahl löschen (Entf)">
+        <button type="button" onClick={removeSelected} disabled={selection.length === 0} title="Auswahl löschen (Entf)">
           🗑 Löschen
         </button>
       </div>

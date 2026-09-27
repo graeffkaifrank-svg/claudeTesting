@@ -32,7 +32,7 @@ export function cmToMeters(cm) {
 }
 
 export function formatLength(cm) {
-  return `${cmToMeters(cm).toFixed(2)} m`;
+  return `${Math.round(cm)} cm`;
 }
 
 export function formatArea(cm2) {
@@ -48,6 +48,41 @@ export function pointToSegmentDistance(p, a, b) {
   t = Math.max(0, Math.min(1, t));
   const point = { x: a.x + t * dx, y: a.y + t * dy };
   return { distance: Math.hypot(p.x - point.x, p.y - point.y), point };
+}
+
+// Closest endpoint of any wall (other than `excludeWallId`) within
+// `threshold` of `point`, or null. Used to snap a wall being drawn/dragged
+// onto an existing wall's corner so the two connect cleanly.
+export function nearestWallEndpoint(point, walls, threshold, excludeWallId) {
+  let best = null;
+  for (const w of walls) {
+    if (w.id === excludeWallId) continue;
+    for (const ep of [
+      { x: w.x1, y: w.y1 },
+      { x: w.x2, y: w.y2 },
+    ]) {
+      const d = Math.hypot(point.x - ep.x, point.y - ep.y);
+      if (d <= threshold && (!best || d < best.distance)) best = { point: ep, distance: d };
+    }
+  }
+  return best ? best.point : null;
+}
+
+// Closest point on any wall's centerline within `threshold` of `point`,
+// plus that wall's angle in degrees. Used to snap furniture (mainly doors
+// and windows) exactly onto the wall it's dropped near, instead of landing
+// just in front of or behind it.
+export function nearestWallLinePoint(point, walls, threshold, excludeWallId) {
+  let best = null;
+  for (const w of walls) {
+    if (w.id === excludeWallId) continue;
+    const { distance: d, point: foot } = pointToSegmentDistance(point, { x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 });
+    if (d <= threshold && (!best || d < best.distance)) {
+      const angle = (Math.atan2(w.y2 - w.y1, w.x2 - w.x1) * 180) / Math.PI;
+      best = { point: foot, distance: d, angle, wallId: w.id };
+    }
+  }
+  return best;
 }
 
 // World-space outline corners for one design element, used to measure the

@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Stage, Layer, Line, Circle, Text, Transformer } from 'react-konva';
+import { Stage, Layer, Line, Circle, Rect, Text, Transformer } from 'react-konva';
 import { useDesignStore, GRID_SIZE } from '../store/useDesignStore';
-import { snapAngle, snapValue, elementDistance, formatLength } from '../utils/geometry';
+import {
+  snapAngle,
+  snapValue,
+  elementDistance,
+  formatLength,
+  nearestWallEndpoint,
+  nearestWallLinePoint,
+  furnitureFootprint,
+} from '../utils/geometry';
 import { FURNITURE_BY_TYPE, SHAPE_PRESETS, rectPoints } from '../data/furnitureCatalog';
 import WallShape from './WallShape';
 import FurnitureShape from './FurnitureShape';
@@ -85,6 +93,7 @@ export default function CanvasEditor() {
   const [wallStart, setWallStart] = useState(null);
   const [previewPoint, setPreviewPoint] = useState(null);
   const [freeformPoints, setFreeformPoints] = useState([]);
+  const [marquee, setMarquee] = useState(null); // {x1,y1,x2,y2} world coords while shift-dragging on empty canvas
 
   const walls = useDesignStore((s) => s.walls);
   const furniture = useDesignStore((s) => s.furniture);
@@ -95,10 +104,13 @@ export default function CanvasEditor() {
   const wallThickness = useDesignStore((s) => s.wallThickness);
   const selectedId = useDesignStore((s) => s.selectedId);
   const selectedKind = useDesignStore((s) => s.selectedKind);
+  const selection = useDesignStore((s) => s.selection);
   const measureIds = useDesignStore((s) => s.measureIds);
   const toggleMeasureElement = useDesignStore((s) => s.toggleMeasureElement);
   const clearMeasureElements = useDesignStore((s) => s.clearMeasureElements);
   const select = useDesignStore((s) => s.select);
+  const selectMany = useDesignStore((s) => s.selectMany);
+  const translateSelection = useDesignStore((s) => s.translateSelection);
   const clearSelection = useDesignStore((s) => s.clearSelection);
   const addWall = useDesignStore((s) => s.addWall);
   const updateWall = useDesignStore((s) => s.updateWall);
@@ -124,14 +136,20 @@ export default function CanvasEditor() {
   const visibleFurniture = useMemo(() => furniture.filter(isVisible), [furniture, isVisible]);
   const visibleShapes = useMemo(() => shapes.filter(isVisible), [shapes, isVisible]);
 
-  // Deselect if the selected item's layer just got hidden — editing
-  // something you can no longer see is confusing.
+  // Drop any selected item whose layer just got hidden — editing something
+  // you can no longer see is confusing.
   useEffect(() => {
-    if (!selectedId || !selectedKind) return;
-    const list = selectedKind === 'wall' ? walls : selectedKind === 'furniture' ? furniture : shapes;
-    const item = list.find((i) => i.id === selectedId);
-    if (item && !isVisible(item)) clearSelection();
-  }, [selectedId, selectedKind, walls, furniture, shapes, isVisible, clearSelection]);
+    if (selection.length === 0) return;
+    const stillVisible = selection.filter(({ id, kind }) => {
+      const list = kind === 'wall' ? walls : kind === 'furniture' ? furniture : shapes;
+      const item = list.find((i) => i.id === id);
+      return item && isVisible(item);
+    });
+    if (stillVisible.length !== selection.length) {
+      if (stillVisible.length === 0) clearSelection();
+      else selectMany(stillVisible, false);
+    }
+  }, [selection, walls, furniture, shapes, isVisible, clearSelection, selectMany]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -196,15 +214,51 @@ export default function CanvasEditor() {
     endFreeformDraft();
   }, [tool, endWallDraft, endFreeformDraft]);
 
+  // Screen-pixel catch radius for corner snapping, converted to world cm so
+  // it feels the same size on screen at any zoom level.
+  const CORNER_SNAP_PX = 14;
+
+  // Snaps a point onto a nearby wall's endpoint (so two walls connect
+  // exactly at a corner instead of by coincidence); falls back to the grid.
+  // `excludeWallId` keeps a wall's own endpoint from "snapping" to itself.
+  const snapWallPoint = useCallback(
+    (point, excludeWallId) => {
+      const corner = nearestWallEndpoint(point, walls, CORNER_SNAP_PX / stageScale, excludeWallId);
+      if (corner) return corner;
+      return snapToGrid ? { x: snapValue(point.x, GRID_SIZE), y: snapValue(point.y, GRID_SIZE) } : point;
+    },
+    [walls, stageScale, snapToGrid]
+  );
+
   const computeSnappedPoint = useCallback(
     (stage) => {
       const raw = getWorldPoint(stage);
+      if (tool === 'wall') {
+        const corner = nearestWallEndpoint(raw, walls, CORNER_SNAP_PX / stageScale, null);
+        if (corner) return corner;
+      }
       let point = snapToGrid ? { x: snapValue(raw.x, GRID_SIZE), y: snapValue(raw.y, GRID_SIZE) } : raw;
       const chainStart = tool === 'freeform' ? freeformPoints[freeformPoints.length - 1] : wallStart;
       if (chainStart) point = snapAngle(chainStart, point, 15);
       return point;
     },
-    [getWorldPoint, snapToGrid, wallStart, tool, freeformPoints]
+    [getWorldPoint, snapToGrid, wallStart, tool, freeformPoints, walls, stageScale]
+  );
+
+  // Snaps furniture (mainly doors/windows) exactly onto a nearby wall's
+  // centerline while dragging, with rotation matched to the wall's angle —
+  // otherwise a plain grid snap can leave a door sitting just in front of
+  // or behind the wall it was dropped on. Falls back to the grid.
+  const snapFurniturePoint = useCallback(
+    (item, point) => {
+      if (item.type === 'door' || item.type === 'window') {
+        const threshold = Math.max(40, (item.depth || 10) * 3, 25 / stageScale);
+        const hit = nearestWallLinePoint(point, walls, threshold);
+        if (hit) return { x: hit.point.x, y: hit.point.y, rotation: hit.angle };
+      }
+      return snapToGrid ? { x: snapValue(point.x, GRID_SIZE), y: snapValue(point.y, GRID_SIZE) } : point;
+    },
+    [walls, snapToGrid, stageScale]
   );
 
   const handleStageMouseDown = useCallback(
@@ -212,6 +266,17 @@ export default function CanvasEditor() {
       const stage = stageRef.current;
       if (!stage) return;
       const clickedOnEmpty = e.target === stage;
+
+      // Shift+drag on empty canvas starts a marquee (rectangle) selection
+      // instead of panning. Turning off the Stage's own dragging here,
+      // imperatively, takes effect before Konva's drag-start logic runs
+      // for this same mousedown — a plain re-render wouldn't be in time.
+      if (tool === 'select' && clickedOnEmpty && e.evt.shiftKey) {
+        stage.draggable(false);
+        const point = getWorldPoint(stage);
+        setMarquee({ x1: point.x, y1: point.y, x2: point.x, y2: point.y });
+        return;
+      }
 
       if (tool === 'wall') {
         const point = computeSnappedPoint(stage);
@@ -237,16 +302,63 @@ export default function CanvasEditor() {
         else clearSelection();
       }
     },
-    [tool, wallStart, wallThickness, computeSnappedPoint, addWall, clearSelection, clearMeasureElements]
+    [tool, wallStart, wallThickness, computeSnappedPoint, addWall, clearSelection, clearMeasureElements, getWorldPoint]
   );
 
   const handleStageMouseMove = useCallback(() => {
-    const active = (tool === 'wall' && wallStart) || (tool === 'freeform' && freeformPoints.length > 0);
-    if (!active) return;
     const stage = stageRef.current;
     if (!stage) return;
+    if (marquee) {
+      const point = getWorldPoint(stage);
+      setMarquee((m) => (m ? { ...m, x2: point.x, y2: point.y } : m));
+      return;
+    }
+    const active = (tool === 'wall' && wallStart) || (tool === 'freeform' && freeformPoints.length > 0);
+    if (!active) return;
     setPreviewPoint(computeSnappedPoint(stage));
-  }, [tool, wallStart, freeformPoints, computeSnappedPoint]);
+  }, [tool, wallStart, freeformPoints, computeSnappedPoint, marquee, getWorldPoint]);
+
+  // Finalizes the marquee on mouse-up anywhere in the window (not just over
+  // the canvas), so a drag that ends outside it still completes cleanly.
+  useEffect(() => {
+    if (!marquee) return;
+    const finalize = () => {
+      const x1 = Math.min(marquee.x1, marquee.x2);
+      const x2 = Math.max(marquee.x1, marquee.x2);
+      const y1 = Math.min(marquee.y1, marquee.y2);
+      const y2 = Math.max(marquee.y1, marquee.y2);
+      const overlaps = (minX, minY, maxX, maxY) => !(maxX < x1 || minX > x2 || maxY < y1 || minY > y2);
+      const hits = [];
+      visibleWalls.forEach((w) => {
+        const minX = Math.min(w.x1, w.x2);
+        const maxX = Math.max(w.x1, w.x2);
+        const minY = Math.min(w.y1, w.y2);
+        const maxY = Math.max(w.y1, w.y2);
+        if (overlaps(minX, minY, maxX, maxY)) hits.push({ id: w.id, kind: 'wall' });
+      });
+      visibleFurniture.forEach((f) => {
+        const pts = furnitureFootprint(f);
+        const xs = pts.map((p) => p.x);
+        const ys = pts.map((p) => p.y);
+        if (overlaps(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys))) {
+          hits.push({ id: f.id, kind: 'furniture' });
+        }
+      });
+      visibleShapes.forEach((s) => {
+        const xs = s.points.map((p) => p.x);
+        const ys = s.points.map((p) => p.y);
+        if (overlaps(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys))) {
+          hits.push({ id: s.id, kind: 'shape' });
+        }
+      });
+      if (hits.length > 0) selectMany(hits, true);
+      setMarquee(null);
+      const stage = stageRef.current;
+      if (stage) stage.draggable(tool === 'select');
+    };
+    window.addEventListener('mouseup', finalize);
+    return () => window.removeEventListener('mouseup', finalize);
+  }, [marquee, visibleWalls, visibleFurniture, visibleShapes, selectMany, tool]);
 
   // Right-click (or Escape) finishes the current wall/freeform chain. We
   // deliberately don't use Konva's dblclick here: it fires purely on
@@ -272,7 +384,7 @@ export default function CanvasEditor() {
         endFreeformDraft();
       }
       if (e.key === 'Enter' && tool === 'freeform') finishFreeform();
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selection.length > 0) {
         e.preventDefault();
         removeSelected();
       }
@@ -296,7 +408,7 @@ export default function CanvasEditor() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedId, removeSelected, undo, redo, endWallDraft, endFreeformDraft, finishFreeform, tool, copySelected, pasteClipboard]);
+  }, [selection, removeSelected, undo, redo, endWallDraft, endFreeformDraft, finishFreeform, tool, copySelected, pasteClipboard]);
 
   const handleDragOver = useCallback((e) => e.preventDefault(), []);
 
@@ -359,6 +471,51 @@ export default function CanvasEditor() {
     return pts;
   }, [freeformPoints, previewPoint]);
 
+  // When the dragged item is part of a multi-selection, move the whole
+  // selection by the same delta instead of just that one item.
+  const isGroupDrag = useCallback(
+    (id, kind) => selection.length > 1 && selection.some((s) => s.id === id && s.kind === kind),
+    [selection]
+  );
+
+  const handleWallDragEnd = useCallback(
+    (id, patch) => {
+      if (isGroupDrag(id, 'wall')) {
+        const wall = walls.find((w) => w.id === id);
+        if (wall) translateSelection(patch.x1 - wall.x1, patch.y1 - wall.y1);
+        return;
+      }
+      updateWall(id, patch);
+    },
+    [isGroupDrag, walls, translateSelection, updateWall]
+  );
+
+  const handleFurnitureDragEnd = useCallback(
+    (id, patch) => {
+      if (isGroupDrag(id, 'furniture')) {
+        const item = furniture.find((f) => f.id === id);
+        if (item) translateSelection(patch.x - item.x, patch.y - item.y);
+        return;
+      }
+      updateFurniture(id, patch);
+    },
+    [isGroupDrag, furniture, translateSelection, updateFurniture]
+  );
+
+  const handleShapeDragEnd = useCallback(
+    (id, patch) => {
+      if (isGroupDrag(id, 'shape')) {
+        const shape = shapes.find((s) => s.id === id);
+        if (shape?.points?.[0] && patch.points?.[0]) {
+          translateSelection(patch.points[0].x - shape.points[0].x, patch.points[0].y - shape.points[0].y);
+        }
+        return;
+      }
+      updateShape(id, patch);
+    },
+    [isGroupDrag, shapes, translateSelection, updateShape]
+  );
+
   const findByKind = useCallback(
     (id, kind) =>
       kind === 'wall' ? walls.find((w) => w.id === id) : kind === 'furniture' ? furniture.find((f) => f.id === id) : shapes.find((s) => s.id === id),
@@ -410,11 +567,13 @@ export default function CanvasEditor() {
               isSelected={
                 tool === 'measure'
                   ? measureIds.some((m) => m.id === shape.id && m.kind === 'shape')
-                  : selectedId === shape.id && selectedKind === 'shape'
+                  : selection.some((s) => s.id === shape.id && s.kind === 'shape')
               }
               draggable={tool === 'select'}
-              onSelect={(id) => (tool === 'measure' ? toggleMeasureElement(id, 'shape') : select(id, 'shape'))}
-              onDragEnd={(id, patch) => updateShape(id, patch)}
+              onSelect={(id, additive) =>
+                tool === 'measure' ? toggleMeasureElement(id, 'shape') : select(id, 'shape', additive)
+              }
+              onDragEnd={handleShapeDragEnd}
               onPointDragEnd={(id, patch) => updateShape(id, patch)}
               snap={snapFn}
             />
@@ -440,13 +599,15 @@ export default function CanvasEditor() {
               isSelected={
                 tool === 'measure'
                   ? measureIds.some((m) => m.id === w.id && m.kind === 'wall')
-                  : selectedId === w.id && selectedKind === 'wall'
+                  : selection.some((s) => s.id === w.id && s.kind === 'wall')
               }
               draggable={tool === 'select'}
-              onSelect={(id) => (tool === 'measure' ? toggleMeasureElement(id, 'wall') : select(id, 'wall'))}
-              onDragEnd={(id, patch) => updateWall(id, patch)}
+              onSelect={(id, additive) =>
+                tool === 'measure' ? toggleMeasureElement(id, 'wall') : select(id, 'wall', additive)
+              }
+              onDragEnd={handleWallDragEnd}
               onEndpointDragEnd={(id, patch) => updateWall(id, patch)}
-              snap={snapFn}
+              snapPoint={(point) => snapWallPoint(point, w.id)}
             />
           ))}
           {previewLinePoints && (
@@ -480,12 +641,14 @@ export default function CanvasEditor() {
               isSelected={
                 tool === 'measure'
                   ? measureIds.some((m) => m.id === item.id && m.kind === 'furniture')
-                  : selectedId === item.id && selectedKind === 'furniture'
+                  : selection.some((s) => s.id === item.id && s.kind === 'furniture')
               }
               draggable={tool === 'select'}
-              onSelect={(id) => (tool === 'measure' ? toggleMeasureElement(id, 'furniture') : select(id, 'furniture'))}
-              onDragEnd={(id, patch) => updateFurniture(id, patch)}
-              snap={snapFn}
+              onSelect={(id, additive) =>
+                tool === 'measure' ? toggleMeasureElement(id, 'furniture') : select(id, 'furniture', additive)
+              }
+              onDragEnd={handleFurnitureDragEnd}
+              snapDrag={(x, y) => snapFurniturePoint(item, { x, y })}
               shapeRef={(node) => {
                 if (node) shapeRefs.current[item.id] = node;
                 else delete shapeRefs.current[item.id];
@@ -495,6 +658,12 @@ export default function CanvasEditor() {
           <Transformer
             ref={transformerRef}
             rotateEnabled
+            // Default is 50 (world cm) — far enough above a selected item's
+            // top edge to land on a different piece of furniture placed
+            // nearby, which can eat that item's next click entirely (the
+            // click lands on the invisible rotate handle instead). A small
+            // room's furniture is routinely closer together than that.
+            rotateAnchorOffset={16}
             rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']}
             boundBoxFunc={(oldBox, newBox) => {
@@ -534,6 +703,21 @@ export default function CanvasEditor() {
             }}
           />
         </Layer>
+
+        {marquee && (
+          <Layer listening={false}>
+            <Rect
+              x={Math.min(marquee.x1, marquee.x2)}
+              y={Math.min(marquee.y1, marquee.y2)}
+              width={Math.abs(marquee.x2 - marquee.x1)}
+              height={Math.abs(marquee.y2 - marquee.y1)}
+              fill="rgba(37,99,235,0.12)"
+              stroke="#2563eb"
+              strokeWidth={1 / stageScale}
+              dash={[6 / stageScale, 4 / stageScale]}
+            />
+          </Layer>
+        )}
       </Stage>
 
       <div className="canvas-hint">
@@ -542,7 +726,10 @@ export default function CanvasEditor() {
           (freeformPoints.length > 0
             ? 'Klicken für weitere Ecken · Rechtsklick/Enter zum Schließen · Esc zum Abbrechen'
             : 'Klicken zum Start einer Freiformfläche')}
-        {tool === 'select' && 'Ziehen zum Verschieben · Entf zum Löschen · Strg+C/V zum Kopieren · Mausrad zum Zoomen'}
+        {tool === 'select' &&
+          (selection.length > 1
+            ? `${selection.length} Elemente ausgewählt · Ziehen zum gemeinsamen Verschieben · Entf zum Löschen`
+            : 'Ziehen zum Verschieben · Shift+Klick/Ziehen für Mehrfachauswahl · Entf zum Löschen · Strg+C/V zum Kopieren · Mausrad zum Zoomen')}
         {tool === 'measure' &&
           (measureIds.length < 2
             ? `Zwei Elemente anklicken (Wände, Möbel oder Flächen), um den Abstand zu messen (${measureIds.length}/2 gewählt)`

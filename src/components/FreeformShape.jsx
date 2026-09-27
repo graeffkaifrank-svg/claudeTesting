@@ -33,11 +33,11 @@ export default function FreeformShape({ shape, isSelected, draggable, onSelect, 
           draggable={draggable}
           onClick={(e) => {
             e.cancelBubble = true;
-            onSelect(shape.id);
+            onSelect(shape.id, e.evt.shiftKey);
           }}
           onTap={(e) => {
             e.cancelBubble = true;
-            onSelect(shape.id);
+            onSelect(shape.id, e.evt.shiftKey);
           }}
           onDragEnd={(e) => {
             const node = e.target;
