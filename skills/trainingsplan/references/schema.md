@@ -2,8 +2,10 @@
 
 Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `id` (bzw. leerem Schlüssel) ignorieren.
 
-## Einheiten (`A:P`)
-`id, datum, uhrzeit, titel, typ, vorlage_id, status, dauer_geplant_min, dauer_ist_min, gefuehl, kommentar, quelle, kalender_event_id, garmin_activity_id, erstellt_am, geaendert_am`
+## Einheiten (`A:R`)
+`id, datum, uhrzeit, titel, typ, vorlage_id, status, dauer_geplant_min, dauer_ist_min, gefuehl, kommentar, quelle, kalender_event_id, garmin_activity_id, erstellt_am, geaendert_am, distanz_km, puls_avg`
+- `dauer_ist_min` darf Dezimalstellen haben (18:08 → 18.13)
+- Läufe: `distanz_km` und `puls_avg` eintragen, wenn bekannt. Pace = dauer_ist_min × 60 / distanz_km Sekunden pro km, Anzeige `m:ss/km`.
 - `status`: `geplant` | `erledigt` | `ausgelassen` | `geloescht`
 - `quelle`: `dashboard` | `sprache` | `migration` | `vorschlag` | `garmin`
 - `gefuehl`: 1–5 oder leer
@@ -36,6 +38,9 @@ Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `
 
 ## Benchmark_Ergebnisse (`A:I`)
 `id, benchmark_id, datum, hauptwert, werte, bedingungen, kommentar, einheit_id, quelle` – Zeiten in Sekunden.
+
+## Journal (`A:E`)
+`id, datum, titel, text, quelle` – Lauf-Blog. `id` = `J-` + 8 Zeichen. `text` als Markdown mit `- ` Aufzählungen.
 
 ## Config (`A:B`)
 `schluessel, wert`: `zeitzone`, `coaching_start`, `kalender_id`, `kalender_sync` (ja/nein), `benchmark_intervall_wochen_standard`, `laktat_schwelle1`, `laktat_schwelle2`, `dashboard_url`, `schema_version`.

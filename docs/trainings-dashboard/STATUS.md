@@ -11,6 +11,15 @@ Stand: 2026-10-30
 | Skill für Sprachbefehle | fertig, muss in claude.ai hochgeladen werden | `skills/trainingsplan.zip` |
 | Garmin via intervals.icu (M7) | offen | Notion-Task „Garmin-Schnittstelle über intervals.icu aufbauen“ |
 
+Update 30.10. (Feedback Kai)
+- Raster und PDF in Ampelfarben: grün = erfüllt, gelb = ≥ 50 %, rot = < 50 %.
+- Charts im IBCS-Stil (Ist dunkel, Soll Umriss, Abweichung grün/rot, Wertbeschriftung, keine Gitterlinien).
+- Nur noch Benchmark B-L1 Referenzlauf aktiv; 3 Ergebnisse mit exakter Zeit und Pace (19:39 · 18:08 · 18:53).
+- Neue Spalten `distanz_km`, `puls_avg`; Pace in Karten, Detail und Tabelle „Letzte Läufe“.
+- Kommentare/Werte aus den Notion-Seiten der Läufe Juli–Oktober übernommen.
+- Lauf-Blog (Tab `Journal`): Claude analysiert die Läufe seit dem letzten Beitrag und gibt einen Tipp. Mit Garmin-Daten (M7) werden Pace und Puls für alle Läufe automatisch gefüllt.
+
 Bekannte Lücken
-- Kommentare aus den Notion-Seiteninhalten (Juli–Oktober) wurden nicht übernommen, nur Titel, Typ, Dauer und Status. Notion bleibt als Archiv.
+- Kommentare aus Notion-Seiten sind nur für Läufe übernommen, nicht für Klettern/Kraft (Juli–Oktober).
+- 18.10. „GA 1 Lauf“ hat in Notion 2 Minuten – vermutlich 2 h, bitte prüfen.
 - Kalender-Sync schreibt in den Hauptkalender (`Config.kalender_id`). Für einen eigenen Kalender „Training“ den Kalender in Google anlegen und seine ID in `Config` eintragen; `kalender_sync = nein` schaltet den Sync ab.

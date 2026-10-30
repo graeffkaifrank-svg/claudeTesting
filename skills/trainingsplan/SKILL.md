@@ -10,6 +10,10 @@ Kais Trainingsdaten liegen im Google Sheet **Trainingsplan 2.0**:
 - Link: https://docs.google.com/spreadsheets/d/11K-STJj8Up1AUSRQ6nWIpm5yBMa3ftp42RNFDilQJZ0/edit
 - Dashboard: https://claude.ai/artifact/WXh8YAo3U8Txnop9YKShW9
 
+Benchmarks: aktuell ist nur **B-L1 Referenzlauf** aktiv (Hausstrecke Schlieren, ca. 4,38 km). Die anderen sind deaktiviert.
+
+Charts und Auswertungen immer im **IBCS-Stil**: Ist als dunkle Säule mit Wertbeschriftung, Soll als Umriss, Abweichungen grün (gut) / rot (schlecht), keine Gitterlinien, Titelzeile „Wer · Was · Einheit · Zeitraum“. Bei Läufen immer Zeit **und** Pace angeben.
+
 Werkzeuge: Google-Sheets-Connector (`get_values`, `append_values`, `update_values`), Google-Calendar-Connector (`create_event`, `update_event`, `delete_event`, `list_events`).
 Tabellenaufbau und alle Spalten: siehe `references/schema.md`. Lies die Datei, bevor du zum ersten Mal schreibst.
 
@@ -54,7 +58,7 @@ Unklar → einmal kurz nachfragen. **Kombi-Einheiten** („Eisgeräte mit Finger
 ### 1. Training erfassen / abhaken
 1. Datum bestimmen („heute“, „gestern“, Wochentag → letztes Vorkommen).
 2. `Einheiten!A:P` lesen, geplante Einheit an dem Tag mit passendem Typ suchen (`status = geplant`).
-3. Gefunden → `status = erledigt`, `dauer_ist_min` (wenn genannt, sonst `dauer_geplant_min`), `kommentar` (Kais Worte, sinngemäss kurz), `gefuehl` 1–5 wenn er eins nennt oder es klar ist. Kalender-Event aktualisieren (Titel mit „✓ “).
+3. Gefunden → `status = erledigt`, `dauer_ist_min` (wenn genannt, sonst `dauer_geplant_min`), `kommentar` (Kais Worte, sinngemäss kurz), `gefuehl` 1–5 wenn er eins nennt oder es klar ist. Bei Läufen `distanz_km` und `puls_avg`, wenn genannt (z.B. „8,2 km, Puls 145“), und die Pace in der Antwort nennen. Kalender-Event aktualisieren (Titel mit „✓ “).
 4. Nicht gefunden → neue Einheit mit `status = erledigt` anlegen, `vorlage_id` passend zum Typ (Tab `Vorlagen`).
 5. Bei Typ `Lauf-Benchmark` zusätzlich ein Ergebnis in `Benchmark_Ergebnisse` anlegen (siehe 5).
 6. Danach Wochenstand berechnen (siehe Regeln in `references/schema.md`) und kurz melden.
@@ -77,6 +81,9 @@ Zeige den Vorschlag als Liste (Tag, Vorlage, Dauer, ein Satz Begründung) und **
 ### 5. Benchmarks
 - Fällig, wenn letztes Ergebnis älter als `intervall_wochen` (Standard 8) – bei Wochenstand und Wochenvorschlag erwähnen.
 - Erfassen: Zeile in `Benchmark_Ergebnisse` mit `hauptwert` (Zeit in Sekunden, Tempo in km/h), alle Messwerte als JSON in `werte`, `bedingungen`, `einheit_id`. Danach Veränderung zum letzten und ersten Ergebnis nennen.
+
+### 5b. Lauf-Blog
+„Schreib einen Blog-Beitrag“ / „analysier meine letzten Läufe“: Läufe seit dem letzten `Journal`-Eintrag (sonst 14 Tage) lesen. Kurzer Beitrag (max. 160 Wörter, sachlich): 1 Satz Überblick, „Was auffällt“ (2–4 Punkte mit Zahlen: Dauer, Pace, Puls, GA1 vs. Intervall, Muster in Kommentaren), „Tipp“ (genau ein konkreter Tipp für 1–2 Wochen). Als Zeile in `Journal` speichern (`quelle = sprache`).
 
 ### 6. Neue Phase nach Coaching
 Kai nennt Coaching-Datum und neue Ziele. Dann: alte aktive Phase `status = abgeschlossen`, `ende` = Tag vor Start. Neue Zeile in `Phasen` (`id` fortlaufend `P-05`, …; `status = aktiv`, Fokus, Coaching-Notizen, ggf. Notion-Link). Hauptziele und Subziele anlegen (Struktur: Klettern / Laufen / Beine, sofern Kai nichts anderes sagt). Danach den Bericht der abgeschlossenen Phase anbieten.
