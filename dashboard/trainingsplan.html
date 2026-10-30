@@ -1,0 +1,947 @@
+<title>Trainingsplan Kai</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: sticky signpost bar + view tabs → view body. Woche = goal ledger (Hauptziele) over 7-day board; Verlauf = streak tiles over heatmap. Accent: Wanderweg-yellow. */
+:root{
+  --bg:#eef0ed; --surface:#fbfcfa; --sunk:#e3e7e3; --ink:#1b2220; --muted:#5b6662; --line:#d2d8d4;
+  --accent:#f0bf1a; --accent-ink:#1b2220;
+  --good:#2f8a4e; --good-soft:#cfe6d6; --info:#3b6fb6; --warn:#c0661d; --bad:#b8433a;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131816; --surface:#1b211f; --sunk:#242b29; --ink:#e6eae7; --muted:#9aa5a0; --line:#323b38;
+  --accent:#f2c42c; --accent-ink:#131816;
+  --good:#5cc07c; --good-soft:#244a33; --info:#73a3e6; --warn:#e69350; --bad:#e2766c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131816; --surface:#1b211f; --sunk:#242b29; --ink:#e6eae7; --muted:#9aa5a0; --line:#323b38;
+  --accent:#f2c42c; --accent-ink:#131816;
+  --good:#5cc07c; --good-soft:#244a33; --info:#73a3e6; --warn:#e69350; --bad:#e2766c; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(80px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:28px;line-height:1;font-weight:700}
+h2{font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+h3{font-size:19px;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+a{color:var(--info)}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sign{display:inline-flex;align-items:center;background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:700;font-size:16px;
+  padding:3px 14px 3px 9px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,0 100%);white-space:nowrap}
+.tabs{display:flex;gap:4px}
+.tab{border:0;background:none;padding:6px 10px;border-radius:6px;font-weight:500;color:var(--muted)}
+.tab[aria-current="page"]{background:var(--ink);color:var(--surface)}
+@media (max-width:760px){
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);justify-content:space-around;
+    padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+  .tab{flex:1;font-size:12px;padding:8px 2px}
+}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 12px;min-height:34px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;min-width:0}
+.banner{border:1px solid var(--warn);border-left-width:4px;background:var(--surface);padding:10px 14px;border-radius:6px}
+.banner.info{border-color:var(--info)}
+.pill{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--good)} .pill.part{color:var(--info)} .pill.miss{color:var(--warn)} .pill.neutral{color:var(--muted)}
+.flame{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.flame b{font-size:16px}
+
+/* Woche */
+.wkhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.total{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+.total .big{font-family:var(--display);font-size:26px;font-weight:700}
+.hzgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.hz{border-top:4px solid var(--hc);display:flex;flex-direction:column;gap:10px}
+.hz .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sub{display:grid;grid-template-columns:18px 1fr auto;gap:4px 8px;align-items:center}
+.sub .ic{font-size:13px;text-align:center}
+.sub .lbl{min-width:0;overflow-wrap:anywhere}
+.sub .val{font-family:var(--mono);font-size:12px;white-space:nowrap}
+.sub .track{grid-column:2 / 4}
+.track{height:7px;background:var(--sunk);border-radius:4px;overflow:hidden;display:flex}
+.track .d{background:var(--good)}
+.track .p{background:repeating-linear-gradient(135deg,var(--info) 0 3px,transparent 3px 6px)}
+.loadbar{display:flex;height:12px;border-radius:4px;overflow:hidden;background:var(--sunk)}
+.loadbar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+.board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+@media (max-width:980px){.board{grid-template-columns:1fr}}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-height:150px;min-width:0}
+@media (max-width:980px){.day{min-height:0}}
+.day.today{border-top:4px solid var(--accent)}
+.day.over{border-color:var(--info);background:color-mix(in srgb,var(--info) 8%,var(--surface))}
+.dh{display:flex;justify-content:space-between;align-items:baseline}
+.dh b{font-family:var(--display);font-size:17px;font-weight:600}
+.add{border:1px dashed var(--line);background:transparent;border-radius:6px;color:var(--muted);padding:4px;font-size:12px}
+.add:hover{color:var(--ink);border-color:var(--muted)}
+.card{display:flex;gap:6px;align-items:flex-start;border:1px solid var(--line);border-left:4px solid var(--cc);border-radius:6px;padding:6px;background:var(--surface);min-width:0}
+.card.geplant{border-style:dashed;border-left-style:solid;background:transparent}
+.card.ausgelassen{opacity:.5}
+.card.ausgelassen .cn{text-decoration:line-through}
+.card.busy{opacity:.55}
+.chk{width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--cc);background:transparent;display:grid;place-items:center;font-size:12px;line-height:1;padding:0;color:var(--surface)}
+.card.erledigt .chk{background:var(--cc)}
+.card .body{flex:1;min-width:0;background:none;border:0;padding:0;text-align:left}
+.cn{font-weight:500;line-height:1.25;overflow-wrap:anywhere}
+.cm{font-size:11px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.grip{border:0;background:none;color:var(--muted);padding:2px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.dragghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-60%) rotate(-2deg);background:var(--accent);color:var(--accent-ink);font-weight:600;border-radius:6px;padding:6px 12px;box-shadow:0 8px 20px rgba(0,0,0,.25);white-space:nowrap}
+.draft{border-style:dashed;border-color:var(--info);background:color-mix(in srgb,var(--info) 6%,var(--surface))}
+
+/* Verlauf */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tile{border-top:4px solid var(--hc)}
+.tile .big{font-family:var(--display);font-size:30px;font-weight:700;line-height:1}
+.hmwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table.hm{border-collapse:separate;border-spacing:3px;font-size:12px}
+table.hm th{font-weight:500;color:var(--muted);white-space:nowrap;padding:2px 4px}
+table.hm th.rl{position:sticky;left:0;background:var(--surface);text-align:left;z-index:1;min-width:120px;color:var(--ink)}
+table.hm th.rl.subrow{font-weight:400;color:var(--muted);padding-left:16px}
+.cell{width:30px;height:24px;border-radius:4px;border:1px solid var(--line);display:block;padding:0;background:transparent;font-size:10px;color:var(--ink)}
+.cell.full{background:var(--good);border-color:var(--good)}
+.cell.exc{background:repeating-linear-gradient(135deg,var(--line) 0 3px,transparent 3px 6px)}
+.cell.cur{border-style:dashed;border-color:var(--muted)}
+.cell.none{opacity:.25}
+.phase-sep{border-left:2px solid var(--ink)}
+.chart{width:100%;height:auto;display:block}
+
+/* sheet */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(8,12,10,.45);display:flex;align-items:flex-end;justify-content:center}
+@media (min-width:700px){.scrim{align-items:center}}
+.sheet{background:var(--surface);border-radius:12px 12px 0 0;width:min(600px,100%);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:12px;
+  padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
+@media (min-width:700px){.sheet{border-radius:12px}}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label,.flabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.field input,.field select,.field textarea{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 9px;min-height:36px;width:100%}
+.field textarea{min-height:80px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:480px){.g3{grid-template-columns:1fr 1fr}}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;padding:7px 4px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.md{background:var(--bg);border-radius:6px;padding:10px 12px;font-size:13px}
+.md ul{margin:0;padding-left:18px}
+.vlist{display:flex;flex-direction:column;gap:6px}
+.vbtn{display:flex;gap:8px;align-items:center;text-align:left;border:1px solid var(--line);border-left:4px solid var(--cc);background:var(--surface);border-radius:6px;padding:8px 10px}
+.vbtn small{color:var(--muted);display:block}
+.toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px;max-width:calc(100% - 32px)}
+.zrow{display:grid;grid-template-columns:1.4fr .9fr .6fr 1.6fr auto;gap:6px;align-items:end}
+@media (max-width:700px){.zrow{grid-template-columns:1fr 1fr}}
+.empty{color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand"><span class="sign" id="phaseSign">Trainingsplan</span><h1>Trainingsplan</h1><span class="small muted" id="fresh"></span></div>
+    <nav class="tabs" aria-label="Ansichten">
+      <button class="tab" data-view="woche">Woche</button>
+      <button class="tab" data-view="verlauf">Verlauf</button>
+      <button class="tab" data-view="leistung">Leistung</button>
+      <button class="tab" data-view="ziele">Ziele</button>
+      <button class="tab" data-view="vorlagen">Vorlagen</button>
+    </nav>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <main id="view"><div class="panel">Lade Daten aus Google Sheets …</div></main>
+</div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+const SHEET_ID = "11K-STJj8Up1AUSRQ6nWIpm5yBMa3ftp42RNFDilQJZ0";
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
+const GS = "Google Sheets", GC = "Google Calendar";
+const TABS = { Einheiten:"A:P", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B" };
+const KEYCOL = { Wochen:"woche", Config:"schluessel", Typen:"typ" };
+const DAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+
+/* ---------- utils ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const monday = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay()+6)%7)); };
+const isoWeek = d => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day); const y0 = new Date(Date.UTC(t.getUTCFullYear(),0,1)); return [t.getUTCFullYear(), Math.ceil(((t-y0)/864e5+1)/7)]; };
+const weekKey = d => { const [y,w] = isoWeek(d); return y + "-W" + pad(w); };
+const num = v => { if (v === "" || v == null) return 0; const n = Number(String(v).replace(",", ".")); return isFinite(n) ? n : 0; };
+const fmtMin = m => { m = Math.round(m); return m >= 60 ? Math.floor(m/60) + " h" + (m%60 ? " " + pad(m%60) : "") : m + " min"; };
+const fmtSec = s => Math.floor(s/60) + ":" + pad(Math.round(s%60));
+const rid = (p, n=8) => p + Array.from({length:n}, () => "abcdefghijkmnpqrstuvwxyz23456789"[Math.floor(Math.random()*32)]).join("");
+const nowIso = () => { const d = new Date(); return iso(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()); };
+function parseDate(v){
+  if (v == null || v === "") return "";
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1]+"-"+m[2]+"-"+m[3];
+  m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.?\s*(\d{4})/); if (m) return m[3]+"-"+pad(m[2])+"-"+pad(m[1]);
+  if (/^\d{5}(\.\d+)?$/.test(s)) { const d = new Date(Date.UTC(1899,11,30) + Number(s)*864e5); return d.toISOString().slice(0,10); }
+  return "";
+}
+const pd = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const dayLabel = s => { const d = pd(s); return DAYS[(d.getDay()+6)%7] + " " + pad(d.getDate()) + "." + pad(d.getMonth()+1) + "."; };
+const shortDate = s => { const d = pd(s); return pad(d.getDate()) + "." + pad(d.getMonth()+1) + "."; };
+const list = s => String(s||"").split(",").map(x => x.trim()).filter(Boolean);
+function md(s){
+  const lines = esc(s).split(/\n/); let out = "", inList = false;
+  for (const l of lines){
+    const li = l.match(/^\s*-\s+(.*)/);
+    const t = (li ? li[1] : l).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    if (li){ if (!inList){ out += "<ul>"; inList = true; } out += "<li>" + t + "</li>"; }
+    else { if (inList){ out += "</ul>"; inList = false; } if (t.trim()) out += "<p style='margin:4px 0'>" + t + "</p>"; }
+  }
+  return out + (inList ? "</ul>" : "");
+}
+let toastT; function toast(m){ const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
+function errText(e){
+  const c = e && e.code, s = (e && e.server) || "Google";
+  switch (c){
+    case "needs_reauth": return s + ": Verbindung abgelaufen. In claude.ai unter Einstellungen → Connectors neu verbinden.";
+    case "server_not_connected": case "server_not_found": return s + " ist nicht verbunden. In claude.ai unter Einstellungen → Connectors hinzufügen.";
+    case "selection_required": return "Mehrere " + s + "-Verbindungen vorhanden. Bitte in claude.ai auswählen, welche das Dashboard nutzt.";
+    case "not_in_manifest": case "approval_required": case "consent_required": return "Das Dashboard darf noch nicht auf " + s + " zugreifen.";
+    case "blocked_by_policy": return s + " ist durch eine Richtlinie gesperrt.";
+    case "server_unavailable": return s + " antwortet gerade nicht. Gleich nochmal versuchen.";
+    case "not_granted": case "capability_disabled": case "capability_removed": return "In dieser Ansicht ist kein Zugriff auf Google möglich. Öffne das Dashboard in claude.ai.";
+    case "tool_error": return s + " hat die Aktion abgelehnt: " + String(e.message||"").slice(0,160);
+    default: return s + "-Fehler" + (c ? " (" + c + ")" : "") + ".";
+  }
+}
+function banner(text, allow){
+  const b = $("banner"); b.hidden = !text; if (!text) return;
+  b.innerHTML = "<div class='spread'><span>" + esc(text) + "</span>" + (allow ? "<button class='btn primary' id='allowBtn'>Zugriff erlauben</button>" : "") + "</div>";
+  if (allow) $("allowBtn").onclick = () => { b.hidden = true; loadAll(true); };
+}
+
+/* ---------- state ---------- */
+const S = { mcp:null, sample:null, dl:null, D:{}, H:{}, loaded:false, view:"woche", week:monday(new Date()), phaseSel:null, busy:new Set(), drafts:[], openHz:new Set(), fresh:null };
+const today = () => iso(new Date());
+const cfg = k => (S.D.Config||[]).find(r => r.schluessel === k)?.wert || "";
+
+function parseTab(name, values){
+  const rows = values || []; const head = (rows[0] || []).map(h => String(h).trim());
+  S.H[name] = head;
+  const out = [];
+  for (let i = 1; i < rows.length; i++){
+    const r = rows[i]; if (!r || !r.length) continue;
+    const o = { _row: i+1 }; head.forEach((h, j) => o[h] = r[j] ?? "");
+    const key = KEYCOL[name] || "id"; if (!String(o[key]||"").trim()) continue;
+    for (const f of ["datum","start","ende"]) if (f in o) o[f] = parseDate(o[f]);
+    out.push(o);
+  }
+  return out;
+}
+const payload = r => { let p = r && r.payload; if (typeof p === "string") { try { p = JSON.parse(p); } catch { } } return p; };
+
+async function getTab(name, fresh){
+  const r = await S.mcp.callTool(GS, "get_values", { spreadsheetId: SHEET_ID, range: name + "!" + TABS[name] }, fresh ? { cache:{ refresh:true, staleTime:0, gcTime:600000 } } : { cache:{ staleTime:60000, gcTime:600000 } });
+  return payload(r)?.values || [];
+}
+let unwatch = null;
+async function loadAll(fresh){
+  if (!S.mcp) return;
+  try {
+    const names = Object.keys(TABS).filter(n => n !== "Einheiten");
+    const res = await Promise.all(names.map(n => getTab(n, fresh)));
+    names.forEach((n, i) => S.D[n] = parseTab(n, res[i]));
+    S.D.Einheiten = parseTab("Einheiten", await getTab("Einheiten", fresh));
+    S.loaded = true; S.fresh = new Date(); banner("");
+    if (!S.phaseSel) S.phaseSel = activePhase()?.id || null;
+    render();
+    if (!unwatch) unwatch = S.mcp.watchTool(GS, "get_values", { spreadsheetId: SHEET_ID, range: "Einheiten!" + TABS.Einheiten }, ev => {
+      if (ev.type === "data"){ if (S.busy.size) return; S.D.Einheiten = parseTab("Einheiten", payload(ev.result)?.values); S.fresh = ev.result.cache ? new Date(ev.result.cache.storedAt) : new Date(); render(); }
+      else if (["needs_reauth","server_not_connected","approval_required","not_in_manifest"].includes(ev.error?.code)) banner(errText(ev.error), ev.error.code !== "needs_reauth" && ev.error.code !== "server_not_connected");
+    }, { refetchInterval: 120000, cache:{ staleTime:60000, gcTime:600000 } });
+  } catch (e){
+    banner(errText(e), ["approval_required","not_in_manifest","consent_required","upstream_error"].includes(e.code));
+    if (!S.loaded) $("view").innerHTML = "<div class='panel'>Die Daten konnten nicht geladen werden. " + esc(errText(e)) + "</div>";
+  }
+}
+
+/* ---------- writes (serialized) ---------- */
+let chain = Promise.resolve();
+const queue = fn => (chain = chain.then(fn, fn));
+const sheetsCall = (tool, input) => S.mcp.callTool(GS, tool, Object.assign({ spreadsheetId: SHEET_ID }, input));
+const rowValues = (tab, o) => (S.H[tab] || []).map(h => { const v = o[h]; return v == null ? "" : (typeof v === "number" ? v : String(v)); });
+function appendRow(tab, o){ return queue(async () => { await sheetsCall("append_values", { range: tab + "!A1", values: [rowValues(tab, o)] }); }); }
+function findRowNo(tab, key){
+  return sheetsCall("get_values", { spreadsheetId: SHEET_ID, range: tab + "!A:A" }).then(r => {
+    const v = payload(r)?.values || []; const i = v.findIndex(x => String(x?.[0]||"").trim() === key);
+    if (i < 1) throw { code:"tool_error", server:GS, message:"Zeile " + key + " nicht gefunden" };
+    return i + 1;
+  });
+}
+function updateRow(tab, o){ return queue(async () => { const key = o[KEYCOL[tab] || "id"]; const n = await findRowNo(tab, key); await sheetsCall("update_values", { range: tab + "!A" + n, values: [rowValues(tab, o)] }); }); }
+function clearRow(tab, key){ return queue(async () => { const n = await findRowNo(tab, key); await sheetsCall("update_values", { range: tab + "!A" + n, values: [(S.H[tab]||[]).map(() => "")] }); }); }
+async function guarded(label, fn, ids){
+  ids?.forEach(i => S.busy.add(i)); render();
+  try { await fn(); return true; }
+  catch (e){ toast(label + ": " + errText(e)); await loadAll(true); return false; }
+  finally { ids?.forEach(i => S.busy.delete(i)); render(); }
+}
+
+/* ---------- derived ---------- */
+const typInfo = t => (S.D.Typen||[]).find(x => x.typ === t) || { kategorie:"Sonstiges", zeit_relevant:"nein", farbe:"#9AA39F" };
+const typColor = t => typInfo(t).farbe || "#9AA39F";
+const vorlage = id => (S.D.Vorlagen||[]).find(v => v.id === id);
+const vorlageForTyp = t => (S.D.Vorlagen||[]).find(v => v.typ === t && v.aktiv !== "nein");
+const phases = () => [...(S.D.Phasen||[])].sort((a,b) => a.start.localeCompare(b.start));
+const activePhase = () => phases().find(p => p.status === "aktiv") || phases().at(-1);
+const phaseFor = mon => phases().find(p => p.start <= addDaysIso(mon,6) && (!p.ende || p.ende >= mon) && p.start <= mon) || phases().find(p => p.start <= addDaysIso(mon,6) && (!p.ende || p.ende >= mon));
+const addDaysIso = (s, n) => iso(addDays(pd(s), n));
+function goalsOf(pid){
+  const hz = (S.D.Hauptziele||[]).filter(h => h.phase_id === pid).sort((a,b) => num(a.reihenfolge)-num(b.reihenfolge));
+  return hz.map(h => ({ ...h, subs: (S.D.Ziele||[]).filter(z => z.hauptziel_id === h.id).sort((a,b) => num(a.reihenfolge)-num(b.reihenfolge)) }));
+}
+const unitsIn = (from, to) => (S.D.Einheiten||[]).filter(u => u.status !== "geloescht" && u.datum >= from && u.datum <= to);
+const matches = (z, u) => { const vals = list(z.filter_werte); return z.filter_ebene === "kategorie" ? vals.includes(typInfo(u.typ).kategorie) : vals.includes(u.typ); };
+const istMin = u => num(u.dauer_ist_min) || num(u.dauer_geplant_min) || 0;
+const planMin = u => num(u.dauer_geplant_min) || num(vorlage(u.vorlage_id)?.dauer_standard_min) || 0;
+const isExc = mon => (S.D.Wochen||[]).find(w => w.woche === weekKey(pd(mon)));
+let evalCache = new Map();
+function evalWeek(mon){
+  if (evalCache.has(mon)) return evalCache.get(mon);
+  const ph = phaseFor(mon); const us = unitsIn(mon, addDaysIso(mon, 6));
+  const hz = ph ? goalsOf(ph.id).map(h => {
+    const subs = h.subs.map(z => {
+      let ist = 0, plan = 0; const ziel = Math.max(1, num(z.zielwert));
+      for (const u of us){ if (!matches(z,u)) continue;
+        if (u.status === "erledigt") ist += z.messgroesse === "minuten" ? istMin(u) : 1;
+        else if (u.status === "geplant") plan += z.messgroesse === "minuten" ? planMin(u) : 1; }
+      const st = ist >= ziel ? "ok" : (ist + plan >= ziel ? "plan" : "miss");
+      return { z, ist, plan, ziel, st, grad: Math.min(1, ist/ziel) };
+    });
+    const ok = subs.length > 0 && subs.every(s => s.st === "ok");
+    const grad = subs.length ? subs.reduce((a,s) => a + s.grad, 0) / subs.length : 0;
+    return { h, subs, ok, grad };
+  }) : [];
+  const res = { mon, ph, us, hz, ok: hz.length > 0 && hz.every(x => x.ok), grad: hz.length ? hz.reduce((a,x) => a + x.grad, 0)/hz.length : 0, exc: isExc(mon) };
+  evalCache.set(mon, res); return res;
+}
+function allWeeks(){
+  const start = cfg("coaching_start") || phases()[0]?.start; if (!start) return [];
+  const out = []; let m = monday(pd(start)); const last = monday(new Date());
+  while (m <= last){ out.push(iso(m)); m = addDays(m, 7); }
+  return out;
+}
+function streak(name){ // name = Hauptziel name or null for Gesamt
+  const cur = iso(monday(new Date())); const ws = allWeeks().filter(w => w < cur).reverse(); let n = 0;
+  for (const w of ws){ const e = evalWeek(w); if (e.exc) continue;
+    if (name){ const h = e.hz.find(x => x.h.name === name); if (!h) continue; if (h.ok) n++; else break; }
+    else { if (!e.hz.length) continue; if (e.ok) n++; else break; } }
+  return n;
+}
+function phaseStats(ph){
+  const cur = iso(monday(new Date()));
+  const ws = allWeeks().filter(w => phaseFor(w)?.id === ph.id);
+  const names = goalsOf(ph.id).map(h => h.name);
+  const stat = (pred) => { let done = 0, eval_ = 0, best = 0, run = 0;
+    for (const w of ws){ if (w >= cur) continue; const e = evalWeek(w); if (e.exc) continue; const r = pred(e); if (r == null) continue; eval_++; if (r){ done++; run++; best = Math.max(best, run); } else run = 0; }
+    return { done, eval: eval_, best }; };
+  const per = {}; names.forEach(n => per[n] = stat(e => { const h = e.hz.find(x => x.h.name === n); return h ? h.ok : null; }));
+  const subs = {}; goalsOf(ph.id).forEach(h => h.subs.forEach(z => subs[z.id] = stat(e => { const hh = e.hz.find(x => x.h.id === h.id); const s = hh?.subs.find(x => x.z.id === z.id); return s ? s.st === "ok" : null; })));
+  const total = stat(e => e.hz.length ? e.ok : null);
+  return { ws, per, subs, total };
+}
+function benchStatus(b){
+  const rs = (S.D.Benchmark_Ergebnisse||[]).filter(r => r.benchmark_id === b.id).sort((a,c) => a.datum.localeCompare(c.datum));
+  const last = rs.at(-1); const iv = num(b.intervall_wochen) || num(cfg("benchmark_intervall_wochen_standard")) || 8;
+  const due = last ? addDaysIso(last.datum, iv*7) : today();
+  return { rs, last, due, isDue: due <= today(), overdueDays: Math.round((pd(today()) - pd(due))/864e5) };
+}
+
+/* ---------- render shell ---------- */
+function render(){
+  evalCache = new Map();
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-current", b.dataset.view === S.view ? "page" : "false"));
+  const ap = activePhase(); $("phaseSign").textContent = ap ? ap.name : "Trainingsplan";
+  $("fresh").textContent = S.fresh ? "Stand " + pad(S.fresh.getHours()) + ":" + pad(S.fresh.getMinutes()) : "";
+  if (!S.loaded) return;
+  const v = $("view");
+  ({ woche: renderWoche, verlauf: renderVerlauf, leistung: renderLeistung, ziele: renderZiele, vorlagen: renderVorlagen }[S.view] || renderWoche)(v);
+}
+function setView(v){ S.view = v; try { history.replaceState(null, "", "#" + v); } catch {} render(); window.scrollTo(0,0); }
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => setView(b.dataset.view));
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h && h !== S.view && ["woche","verlauf","leistung","ziele","vorlagen"].includes(h)) { S.view = h; render(); } });
+
+/* ---------- Woche ---------- */
+function statusIcon(st){ return st === "ok" ? "<span style='color:var(--good)'>✓</span>" : st === "plan" ? "<span style='color:var(--info)'>◐</span>" : "<span style='color:var(--warn)'>○</span>"; }
+function subVal(s){ const f = s.z.messgroesse === "minuten" ? fmtMin : (x => x + "×"); return f(s.ist) + " / " + f(s.ziel) + (s.plan ? " <span class='muted'>+" + f(s.plan) + "</span>" : ""); }
+function renderWoche(v){
+  const mon = iso(S.week), sun = addDaysIso(mon, 6), e = evalWeek(mon), [, kw] = isoWeek(S.week);
+  const isCur = mon === iso(monday(new Date()));
+  const okN = e.hz.filter(h => h.ok).length;
+  const dueB = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein").map(b => ({ b, s: benchStatus(b) })).filter(x => x.s.isDue);
+  const cats = {}; let doneM = 0, planM = 0;
+  for (const u of e.us){ const k = typInfo(u.typ).kategorie; cats[k] = cats[k] || { d:0, p:0, c: typColor(u.typ) };
+    if (u.status === "erledigt"){ cats[k].d += istMin(u); doneM += istMin(u); } else if (u.status === "geplant"){ cats[k].p += planMin(u); planM += planMin(u); } }
+  const tot = Math.max(1, doneM + planM);
+  let h = "<section class='wkhead'><div class='row'><button class='btn' id='wPrev' aria-label='Vorherige Woche'>‹</button><button class='btn' id='wNow'>Heute</button><button class='btn' id='wNext' aria-label='Nächste Woche'>›</button></div>"
+    + "<h2 class='num'>KW " + kw + " · " + shortDate(mon) + "–" + shortDate(sun) + "</h2>"
+    + (e.ph ? "<span class='pill neutral'>" + esc(e.ph.name) + "</span>" : "<span class='pill neutral'>keine Phase</span>")
+    + (e.exc ? "<span class='pill part'>" + esc(e.exc.art) + "</span>" : "") + "</section>";
+  if (e.hz.length){
+    h += "<section class='panel'><div class='total'><span class='big num'>" + okN + " / " + e.hz.length + "</span><span>Hauptziele erfüllt" + (isCur ? " (läuft)" : "") + "</span>"
+      + "<span class='flame'>Gesamt-Streak <b class='num'>" + streak(null) + "</b></span>"
+      + "<span class='muted small'>" + fmtMin(doneM) + " trainiert · " + fmtMin(planM) + " geplant</span></div>"
+      + "<div class='loadbar' style='margin-top:10px' role='img' aria-label='Load nach Kategorie'>" + Object.entries(cats).map(([k,c]) => (c.d ? "<span title='" + esc(k) + " erledigt' style='width:" + (c.d/tot*100) + "%;background:" + c.c + "'></span>" : "") + (c.p ? "<span title='" + esc(k) + " geplant' style='width:" + (c.p/tot*100) + "%;background:repeating-linear-gradient(135deg," + c.c + " 0 3px,transparent 3px 6px)'></span>" : "")).join("") + "</div>"
+      + "<div class='legend' style='margin-top:6px'>" + Object.entries(cats).map(([k,c]) => "<span><i class='sw' style='background:" + c.c + "'></i>" + esc(k) + " " + fmtMin(c.d) + (c.p ? " (+" + fmtMin(c.p) + ")" : "") + "</span>").join("") + "</div></section>";
+    h += "<section class='hzgrid'>" + e.hz.map(x => "<div class='panel hz' style='--hc:" + esc(x.h.farbe) + "'><div class='top'><h3>" + esc(x.h.name) + "</h3><div class='row'>"
+      + "<span class='flame'>Streak <b class='num'>" + streak(x.h.name) + "</b></span>"
+      + (x.ok ? "<span class='pill ok'>erfüllt</span>" : x.grad > 0 ? "<span class='pill part'>" + Math.round(x.grad*100) + " %</span>" : "<span class='pill miss'>offen</span>") + "</div></div>"
+      + x.subs.map(s => "<div class='sub'><span class='ic'>" + statusIcon(s.st) + "</span><span class='lbl'>" + esc(s.z.bezeichnung) + "</span><span class='val num'>" + subVal(s) + "</span>"
+        + "<div class='track'><span class='d' style='width:" + Math.min(100, s.ist/s.ziel*100) + "%'></span><span class='p' style='width:" + Math.max(0, Math.min(100 - s.ist/s.ziel*100, s.plan/s.ziel*100)) + "%'></span></div></div>").join("")
+      + "</div>").join("") + "</section>";
+  } else h += "<div class='panel'>Für diese Woche ist keine Phase mit Zielen hinterlegt.</div>";
+  if (dueB.length) h += "<div class='banner info'><div class='spread'><span><b>Benchmark fällig:</b> " + dueB.map(x => esc(x.b.name) + (x.s.overdueDays > 0 ? " (seit " + x.s.overdueDays + " Tagen)" : "")).join(", ") + "</span><button class='btn' id='planBench'>Einplanen</button></div></div>";
+  h += "<section class='spread'><h2>Kalender</h2><div class='row'><button class='btn' id='suggest'>Woche vorschlagen</button><select class='btn' id='excSel' aria-label='Woche als Ausnahme markieren'>"
+    + ["","krank","urlaub","tourenwoche","deload"].map(a => "<option value='" + a + "'" + ((e.exc?.art||"") === a ? " selected" : "") + ">" + (a ? "Ausnahme: " + a : "Normale Woche") + "</option>").join("") + "</select></div></section>";
+  if (S.drafts.length){
+    h += "<div class='panel draft'><div class='spread'><b>Vorschlag (" + S.drafts.length + " Einheiten)</b><div class='row'><button class='btn primary' id='dAll'>Alle übernehmen</button><button class='btn ghost' id='dNone'>Verwerfen</button></div></div>"
+      + "<div class='vlist' style='margin-top:8px'>" + S.drafts.map((d,i) => "<div class='vbtn' style='--cc:" + typColor(d.typ) + "'><div style='flex:1;min-width:0'><b>" + dayLabel(d.datum) + " · " + esc(d.titel) + "</b>" + (d.dauer ? " <span class='muted num'>" + d.dauer + " min</span>" : "") + "<small>" + esc(d.begruendung||"") + "</small></div><button class='btn' data-dok='" + i + "'>Übernehmen</button><button class='btn ghost' data-dno='" + i + "' aria-label='Verwerfen'>✕</button></div>").join("") + "</div></div>";
+  }
+  h += "<section class='board' id='board'>";
+  for (let i = 0; i < 7; i++){
+    const d = addDaysIso(mon, i), us = e.us.filter(u => u.datum === d).sort((a,b) => (a.uhrzeit||"").localeCompare(b.uhrzeit||""));
+    const m = us.filter(u => u.status === "erledigt").reduce((a,u) => a + istMin(u), 0);
+    h += "<div class='day" + (d === today() ? " today" : "") + "' data-day='" + d + "'><div class='dh'><b>" + dayLabel(d) + "</b><span class='small muted num'>" + (m ? fmtMin(m) : "") + "</span></div>"
+      + us.map(cardHTML).join("") + "<button class='add' data-add='" + d + "'>+ Einheit</button></div>";
+  }
+  v.innerHTML = h + "</section>";
+  $("wPrev").onclick = () => { S.week = addDays(S.week, -7); S.drafts = []; render(); };
+  $("wNext").onclick = () => { S.week = addDays(S.week, 7); S.drafts = []; render(); };
+  $("wNow").onclick = () => { S.week = monday(new Date()); S.drafts = []; render(); };
+  $("excSel").onchange = ev => setException(mon, ev.target.value);
+  $("suggest").onclick = () => suggestWeek(mon);
+  if ($("planBench")) $("planBench").onclick = () => { const b = dueB[0].b; openAdd(d0(mon), b.vorlage_id); };
+  if ($("dAll")) $("dAll").onclick = async () => { const ds = S.drafts.slice(); S.drafts = []; for (const d of ds) await createUnit(d); };
+  if ($("dNone")) $("dNone").onclick = () => { S.drafts = []; render(); };
+  v.querySelectorAll("[data-dok]").forEach(b => b.onclick = async () => { const d = S.drafts.splice(+b.dataset.dok, 1)[0]; await createUnit(d); });
+  v.querySelectorAll("[data-dno]").forEach(b => b.onclick = () => { S.drafts.splice(+b.dataset.dno, 1); render(); });
+}
+const d0 = mon => (today() >= mon && today() <= addDaysIso(mon,6)) ? today() : mon;
+function cardHTML(u){
+  const zr = typInfo(u.typ).zeit_relevant === "ja";
+  const mins = u.status === "erledigt" ? istMin(u) : planMin(u);
+  return "<div class='card " + esc(u.status) + (S.busy.has(u.id) ? " busy" : "") + "' style='--cc:" + typColor(u.typ) + "'>"
+    + "<button class='chk' data-chk='" + esc(u.id) + "' aria-label='" + (u.status === "erledigt" ? "Als geplant markieren" : "Abhaken") + "'>" + (u.status === "erledigt" ? "✓" : "") + "</button>"
+    + "<button class='body' data-open='" + esc(u.id) + "'><div class='cn'>" + esc(u.titel || u.typ) + "</div><div class='cm'>" + (u.uhrzeit ? "<span class='num'>" + esc(u.uhrzeit) + "</span>" : "") + "<span>" + esc(u.typ) + "</span>"
+    + ((zr || u.status !== "erledigt") && mins ? "<span class='num'>" + mins + " min</span>" : "") + (u.kommentar ? "<span title='Kommentar'>✎</span>" : "") + "</div></button>"
+    + "<button class='grip' data-drag='" + esc(u.id) + "' aria-label='Verschieben'>⋮⋮</button></div>";
+}
+
+/* ---------- unit actions ---------- */
+const unitById = id => (S.D.Einheiten||[]).find(u => u.id === id);
+async function createUnit(d){
+  const v = d.vorlage_id ? vorlage(d.vorlage_id) : null;
+  const u = { id: rid("E-"), datum: d.datum, uhrzeit: d.uhrzeit || "", titel: d.titel || v?.name || d.typ, typ: d.typ || v?.typ || "Sonstiges", vorlage_id: d.vorlage_id || "",
+    status: d.status || (d.datum < today() ? "erledigt" : "geplant"), dauer_geplant_min: d.dauer || num(v?.dauer_standard_min) || "", dauer_ist_min: d.dauer_ist || "", gefuehl: "", kommentar: d.kommentar || "",
+    quelle: d.quelle || "dashboard", kalender_event_id: "", garmin_activity_id: "", erstellt_am: nowIso(), geaendert_am: nowIso() };
+  S.D.Einheiten.push(u);
+  const ok = await guarded("Anlegen fehlgeschlagen", () => appendRow("Einheiten", u), [u.id]);
+  if (ok){ toast("„" + u.titel + "“ für " + dayLabel(u.datum) + " gespeichert"); if (u.status === "geplant") calSync(u, "create"); }
+  return u;
+}
+async function saveUnit(u, calAction){
+  u.geaendert_am = nowIso();
+  const ok = await guarded("Speichern fehlgeschlagen", () => updateRow("Einheiten", u), [u.id]);
+  if (ok && calAction) calSync(u, calAction);
+  return ok;
+}
+async function toggleDone(u){
+  if (u.status === "erledigt"){ u.status = "geplant"; u.dauer_ist_min = ""; return saveUnit(u, "update"); }
+  if (typInfo(u.typ).zeit_relevant === "ja" || u.typ === "Lauf-Benchmark") return openCheckoff(u);
+  u.status = "erledigt"; if (!u.dauer_ist_min) u.dauer_ist_min = u.dauer_geplant_min || "";
+  return saveUnit(u, "update");
+}
+async function setException(mon, art){
+  const wk = weekKey(pd(mon)); const ex = (S.D.Wochen||[]).find(w => w.woche === wk);
+  if (!art && ex){ S.D.Wochen = S.D.Wochen.filter(w => w !== ex); await guarded("Speichern fehlgeschlagen", () => clearRow("Wochen", wk)); }
+  else if (art && ex){ ex.art = art; await guarded("Speichern fehlgeschlagen", () => updateRow("Wochen", ex)); }
+  else if (art){ const o = { woche: wk, art, notiz: "" }; S.D.Wochen.push(o); await guarded("Speichern fehlgeschlagen", () => appendRow("Wochen", o)); }
+  toast(art ? "Woche als " + art + " markiert – zählt nicht für Streaks" : "Ausnahme entfernt");
+}
+
+/* ---------- calendar ---------- */
+const calOn = () => cfg("kalender_sync") === "ja" && S.mcp;
+function calTimes(u){
+  if (u.uhrzeit){ const [hh, mm] = u.uhrzeit.split(":").map(Number); const st = pd(u.datum); st.setHours(hh, mm||0); const en = new Date(st.getTime() + (planMin(u)||60)*6e4);
+    const f = d => iso(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":00"; return { startTime: f(st), endTime: f(en), allDay: false }; }
+  return { startTime: u.datum + "T00:00:00", endTime: addDaysIso(u.datum, 1) + "T00:00:00", allDay: true };
+}
+function calDesc(u){ const v = vorlage(u.vorlage_id) || vorlageForTyp(u.typ); const url = cfg("dashboard_url");
+  return [u.typ + (planMin(u) ? " · " + planMin(u) + " min" : ""), v?.kurzbeschreibung, v?.anleitung, url ? "Dashboard: " + url : "", "Sheet: " + SHEET_URL].filter(Boolean).join("\n\n"); }
+async function calSync(u, action){
+  if (!calOn()) return;
+  const cal = cfg("kalender_id") || undefined;
+  try {
+    if (action === "create" || (action === "update" && !u.kalender_event_id && u.status === "geplant")){
+      const r = await S.mcp.callTool(GC, "create_event", Object.assign({ calendarId: cal, summary: "Training: " + (u.titel || u.typ), description: calDesc(u), availability: "AVAILABILITY_FREE" }, calTimes(u)));
+      const p = payload(r) || {}; const id = p.id || p.eventId || p.event?.id || p.event?.eventId;
+      if (id){ u.kalender_event_id = id; await updateRow("Einheiten", u); }
+      return;
+    }
+    if (!u.kalender_event_id) return;
+    if (u.status === "ausgelassen" || u.status === "geloescht"){
+      await S.mcp.callTool(GC, "delete_event", { calendarId: cal, eventId: u.kalender_event_id, notificationLevel: "NONE" });
+      u.kalender_event_id = ""; await updateRow("Einheiten", u); return;
+    }
+    await S.mcp.callTool(GC, "update_event", Object.assign({ calendarId: cal, eventId: u.kalender_event_id, notificationLevel: "NONE",
+      summary: (u.status === "erledigt" ? "✓ " : "Training: ") + (u.titel || u.typ), description: calDesc(u) }, calTimes(u)));
+  } catch (e){ toast("Kalender: " + errText(Object.assign({ server: GC }, e))); }
+}
+
+/* ---------- drag & drop ---------- */
+let drag = null;
+document.addEventListener("pointerdown", ev => {
+  const h = ev.target.closest("[data-drag]"); if (!h || ev.button > 0) return;
+  ev.preventDefault(); const u = unitById(h.dataset.drag);
+  drag = { id: h.dataset.drag, x: ev.clientX, y: ev.clientY, moved: false, ghost: null, over: null, pid: ev.pointerId, label: u?.titel || "Einheit" };
+  try { h.setPointerCapture(ev.pointerId); } catch {}
+});
+document.addEventListener("pointermove", ev => {
+  if (!drag || ev.pointerId !== drag.pid) return;
+  if (!drag.moved && Math.hypot(ev.clientX-drag.x, ev.clientY-drag.y) < 6) return;
+  if (!drag.moved){ drag.moved = true; const g = document.createElement("div"); g.className = "dragghost"; g.textContent = drag.label; document.body.appendChild(g); drag.ghost = g; }
+  drag.ghost.style.left = ev.clientX + "px"; drag.ghost.style.top = ev.clientY + "px";
+  const day = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".day");
+  if (day !== drag.over){ drag.over?.classList.remove("over"); day?.classList.add("over"); drag.over = day; }
+  if (ev.clientY < 60) window.scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) window.scrollBy(0, 12);
+});
+function endDrag(ev, cancel){
+  if (!drag || ev.pointerId !== drag.pid) return; const d = drag; drag = null;
+  d.ghost?.remove(); d.over?.classList.remove("over");
+  const u = unitById(d.id); if (!u || cancel) return;
+  if (!d.moved) return openUnit(u);
+  if (!d.over || d.over.dataset.day === u.datum) return;
+  u.datum = d.over.dataset.day; saveUnit(u, "update").then(ok => ok && toast("Auf " + dayLabel(u.datum) + " verschoben"));
+}
+document.addEventListener("pointerup", ev => endDrag(ev, false));
+document.addEventListener("pointercancel", ev => endDrag(ev, true));
+document.addEventListener("click", ev => {
+  const c = ev.target.closest("[data-chk]"); if (c){ const u = unitById(c.dataset.chk); if (u && !S.busy.has(u.id)) toggleDone(u); return; }
+  const o = ev.target.closest("[data-open]"); if (o){ const u = unitById(o.dataset.open); if (u) openUnit(u); return; }
+  const a = ev.target.closest("[data-add]"); if (a) openAdd(a.dataset.add);
+});
+
+/* ---------- sheets (dialogs) ---------- */
+function openSheet(html, after){ $("sheet").innerHTML = html; $("scrim").hidden = false; after && after($("sheet")); $("sheet").querySelector("input,select,textarea,button")?.focus(); }
+function closeSheet(){ $("scrim").hidden = true; $("sheet").innerHTML = ""; }
+$("scrim").addEventListener("click", ev => { if (ev.target === $("scrim")) closeSheet(); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("scrim").hidden) closeSheet(); });
+const segHTML = (id, opts, val) => "<div class='seg' id='" + id + "'>" + opts.map(([v,l]) => "<button type='button' data-v='" + esc(v) + "' aria-pressed='" + (String(val) === String(v)) + "'>" + esc(l) + "</button>").join("") + "</div>";
+const segVal = id => $(id).querySelector("[aria-pressed='true']")?.dataset.v ?? "";
+function wireSegs(root){ root.querySelectorAll(".seg").forEach(s => s.querySelectorAll("button").forEach(b => b.onclick = () => s.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)))); }
+const typOptions = sel => [...new Set((S.D.Typen||[]).filter(t => t.aktiv !== "nein").map(t => t.kategorie))].map(k => "<optgroup label='" + esc(k) + "'>" + (S.D.Typen||[]).filter(t => t.kategorie === k && t.aktiv !== "nein").map(t => "<option" + (t.typ === sel ? " selected" : "") + ">" + esc(t.typ) + "</option>").join("") + "</optgroup>").join("");
+function anleitungHTML(v){ if (!v) return ""; return "<div class='field'><span class='flabel'>Anleitung · " + esc(v.name) + "</span><div class='md'>" + md(v.anleitung || v.kurzbeschreibung || "") + (v.anleitung_link ? "<p style='margin:6px 0 0'><a href='" + esc(v.anleitung_link) + "' target='_blank' rel='noopener'>Quelle öffnen ↗</a></p>" : "") + "</div></div>"; }
+
+function openAdd(date, preVorlage){
+  const vs = (S.D.Vorlagen||[]).filter(v => v.aktiv !== "nein");
+  openSheet("<h2>Einheit hinzufügen</h2><div class='g2'><div class='field'><label for='aDate'>Tag</label><input type='date' id='aDate' value='" + date + "'></div><div class='field'><label for='aTime'>Uhrzeit (optional)</label><input type='time' id='aTime'></div></div>"
+    + "<span class='flabel'>Aus Vorlage</span><div class='vlist'>" + vs.map(v => "<button class='vbtn' data-v='" + esc(v.id) + "' style='--cc:" + typColor(v.typ) + "'><div><b>" + esc(v.name) + "</b> <span class='muted num small'>" + (v.dauer_standard_min ? v.dauer_standard_min + " min" : "") + "</span><small>" + esc(v.kurzbeschreibung) + "</small></div></button>").join("") + "</div>"
+    + "<span class='flabel'>Ohne Vorlage</span><div class='g2'><div class='field'><label for='aTyp'>Typ</label><select id='aTyp'>" + typOptions("GA1") + "</select></div><div class='field'><label for='aTitel'>Titel</label><input id='aTitel' placeholder='z.B. Lauf mit Vicci'></div></div>"
+    + "<div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='aFree'>Ohne Vorlage anlegen</button></div>", sh => {
+      $("cx").onclick = closeSheet;
+      const go = d => { const base = { datum: $("aDate").value || date, uhrzeit: $("aTime").value }; closeSheet(); createUnit(Object.assign(base, d)); };
+      sh.querySelectorAll("[data-v]").forEach(b => b.onclick = () => go({ vorlage_id: b.dataset.v }));
+      $("aFree").onclick = () => go({ typ: $("aTyp").value, titel: $("aTitel").value.trim() || $("aTyp").value });
+      if (preVorlage) sh.querySelector("[data-v='" + preVorlage + "']")?.focus();
+    });
+}
+function openCheckoff(u){
+  const isBench = u.typ === "Lauf-Benchmark";
+  const b = isBench ? (S.D.Benchmarks||[]).find(x => x.vorlage_id === u.vorlage_id) : null;
+  openSheet("<h2>" + esc(u.titel) + " abhaken</h2><div class='g2'><div class='field'><label for='cMin'>Minuten</label><input id='cMin' type='number' inputmode='numeric' min='0' value='" + esc(u.dauer_ist_min || planMin(u) || "") + "'></div>"
+    + "<div class='field'><span class='flabel'>Gefühl</span>" + segHTML("cGef", [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"]], u.gefuehl) + "</div></div>"
+    + "<div class='field'><label for='cKom'>Wie lief es?</label><textarea id='cKom'>" + esc(u.kommentar) + "</textarea></div>"
+    + (b ? benchFieldsHTML(b) : "")
+    + "<div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='cOk'>Erledigt</button></div>", sh => {
+      wireSegs(sh); $("cx").onclick = closeSheet;
+      $("cOk").onclick = async () => {
+        u.status = "erledigt"; u.dauer_ist_min = $("cMin").value ? Number($("cMin").value) : ""; u.gefuehl = segVal("cGef"); u.kommentar = $("cKom").value.trim();
+        const res = b ? readBench(b) : null; closeSheet();
+        const ok = await saveUnit(u, "update");
+        if (ok && res) await saveBenchResult(b, res, u);
+      };
+    });
+}
+function openUnit(u){
+  const v = vorlage(u.vorlage_id) || vorlageForTyp(u.typ);
+  openSheet("<h2>" + esc(u.titel || u.typ) + "</h2>"
+    + "<div class='field'><label for='uTitel'>Titel</label><input id='uTitel' value='" + esc(u.titel) + "'></div>"
+    + "<div class='g3'><div class='field'><label for='uDate'>Tag</label><input type='date' id='uDate' value='" + esc(u.datum) + "'></div><div class='field'><label for='uTime'>Uhrzeit</label><input type='time' id='uTime' value='" + esc(u.uhrzeit) + "'></div>"
+    + "<div class='field'><label for='uTyp'>Typ</label><select id='uTyp'>" + typOptions(u.typ) + "</select></div></div>"
+    + "<div class='field'><span class='flabel'>Status</span>" + segHTML("uSt", [["geplant","Geplant"],["erledigt","Erledigt"],["ausgelassen","Ausgelassen"]], u.status) + "</div>"
+    + "<div class='g3'><div class='field'><label for='uPlan'>Geplant [min]</label><input id='uPlan' type='number' inputmode='numeric' min='0' value='" + esc(u.dauer_geplant_min) + "'></div><div class='field'><label for='uIst'>Ist [min]</label><input id='uIst' type='number' inputmode='numeric' min='0' value='" + esc(u.dauer_ist_min) + "'></div>"
+    + "<div class='field'><span class='flabel'>Gefühl</span>" + segHTML("uGef", [["","–"],["1","1"],["2","2"],["3","3"],["4","4"],["5","5"]], u.gefuehl) + "</div></div>"
+    + "<div class='field'><label for='uKom'>Kommentar</label><textarea id='uKom'>" + esc(u.kommentar) + "</textarea></div>"
+    + anleitungHTML(v)
+    + "<div class='spread'><button class='btn danger' id='uDel'>Löschen</button><div class='row'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='uSave'>Speichern</button></div></div>", sh => {
+      wireSegs(sh); $("cx").onclick = closeSheet;
+      $("uDel").onclick = async () => { if ($("uDel").dataset.sure !== "1"){ $("uDel").dataset.sure = "1"; $("uDel").textContent = "Wirklich löschen?"; return; } u.status = "geloescht"; closeSheet(); await saveUnit(u, "update"); toast("Gelöscht"); };
+      $("uSave").onclick = async () => {
+        Object.assign(u, { titel: $("uTitel").value.trim() || u.titel, datum: $("uDate").value || u.datum, uhrzeit: $("uTime").value, typ: $("uTyp").value, status: segVal("uSt"),
+          dauer_geplant_min: $("uPlan").value === "" ? "" : Number($("uPlan").value), dauer_ist_min: $("uIst").value === "" ? "" : Number($("uIst").value), gefuehl: segVal("uGef"), kommentar: $("uKom").value.trim() });
+        closeSheet(); if (await saveUnit(u, "update")) toast("Gespeichert");
+      };
+    });
+}
+
+/* ---------- Wochenvorschlag ---------- */
+async function suggestWeek(mon){
+  if (!S.sample){ toast("Vorschläge gehen nur in claude.ai mit freigegebener KI-Funktion."); return; }
+  const e = evalWeek(mon); if (!e.ph){ toast("Keine Phase für diese Woche."); return; }
+  const btn = $("suggest"); btn.disabled = true; btn.textContent = "Claude plant …";
+  try {
+    let busy = "";
+    if (S.mcp){ try { const r = await S.mcp.callTool(GC, "list_events", { startTime: mon + "T00:00:00", endTime: addDaysIso(mon, 7) + "T00:00:00", pageSize: 100, orderBy: "startTime" });
+      const p = payload(r) || {}; const evs = p.events || p.items || [];
+      busy = evs.filter(x => !String(x.summary||"").startsWith("Training:")).map(x => { const s = x.start?.dateTime || x.start?.date || x.startTime || ""; const en = x.end?.dateTime || x.end?.date || x.endTime || ""; return "- " + s + " bis " + en + ": " + (x.summary || "Termin"); }).join("\n"); } catch {} }
+    const prev = [1,2,3,4].map(k => { const w = addDaysIso(mon, -7*k); const ev = evalWeek(w); const m = ev.us.filter(u => u.status === "erledigt").reduce((a,u) => a + istMin(u), 0);
+      return "- KW ab " + w + ": " + fmtMin(m) + ", Hauptziele erfüllt: " + ev.hz.filter(h => h.ok).map(h => h.h.name).join(", ") + "; Kommentare: " + ev.us.filter(u => u.kommentar).map(u => u.titel + ": " + u.kommentar).join(" | ").slice(0, 400); }).join("\n");
+    const goals = e.hz.map(x => x.h.name + ": " + x.subs.map(s => s.z.bezeichnung + " " + (s.z.messgroesse === "minuten" ? s.ziel + " min" : s.ziel + "×") + " (Filter " + s.z.filter_ebene + ": " + s.z.filter_werte + "; bereits erledigt " + s.ist + ", geplant " + s.plan + ")").join("; ")).join("\n");
+    const existing = e.us.map(u => "- " + u.datum + " " + u.typ + " (" + u.status + ")").join("\n") || "keine";
+    const vs = (S.D.Vorlagen||[]).filter(v => v.aktiv !== "nein").map(v => "- " + v.id + ": " + v.name + " (Typ " + v.typ + ", Kategorie " + typInfo(v.typ).kategorie + ", " + v.dauer_standard_min + " min)").join("\n");
+    const due = (S.D.Benchmarks||[]).filter(b => benchStatus(b).isDue).map(b => b.name + " → Vorlage " + b.vorlage_id).join(", ") || "keine";
+    const prompt = "Du planst eine Trainingswoche für Kai (Bergführer-Anwärter, 100 % Job, trainiert meist morgens 30–60 min, Touren am Wochenende). Antworte NUR mit JSON.\n\n"
+      + "Woche: " + mon + " (Montag) bis " + addDaysIso(mon,6) + ". Heute ist " + today() + "; plane nur Tage ab heute.\n"
+      + "Phase: " + e.ph.name + " – " + e.ph.fokus + "\nCoaching-Notizen: " + e.ph.coaching_notizen + "\n\n"
+      + "Wochenziele (alle Subziele sollen erfüllt werden):\n" + goals + "\n\nBereits in der Woche:\n" + existing + "\n\nFällige Benchmarks: " + due + "\n\n"
+      + "Termine im Kalender (Konflikte vermeiden):\n" + (busy || "keine bekannt") + "\n\nLetzte 4 Wochen:\n" + prev + "\n\nVorlagen:\n" + vs + "\n\n"
+      + "Regeln: keine zwei harten Kraft-Einheiten (Fingerkraft Max, Bouldern Max, Beintraining) an aufeinanderfolgenden Tagen; kein Intervall am Tag nach Fingerkraft Max oder Beintraining; nach Kraft nur GA1/Recovery; max. 2 Einheiten pro Tag; Fingerkraft Max kann mit Eisgeräte am selben Tag kombiniert werden. Plane nur, was zur Zielerfüllung fehlt, plus höchstens einen Benchmark.\n\n"
+      + "Format: {\"einheiten\":[{\"datum\":\"YYYY-MM-DD\",\"vorlage_id\":\"V-…\",\"dauer\":Minuten,\"begruendung\":\"ein kurzer Satz auf Deutsch\"}]}";
+    const out = await S.sample.json(prompt, { modelTier: "default" });
+    const arr = Array.isArray(out) ? out : (out?.einheiten || []);
+    S.drafts = arr.filter(x => x && x.datum >= mon && x.datum <= addDaysIso(mon,6) && vorlage(x.vorlage_id)).map(x => { const v = vorlage(x.vorlage_id); return { datum: x.datum, vorlage_id: v.id, typ: v.typ, titel: v.name, dauer: Number(x.dauer) || num(v.dauer_standard_min), begruendung: x.begruendung, quelle: "vorschlag", status: "geplant" }; });
+    if (!S.drafts.length) toast("Claude hat keine zusätzlichen Einheiten vorgeschlagen – die Woche deckt die Ziele ab.");
+  } catch (err){ toast(err?.code === "not_granted" ? "KI-Vorschläge sind für diese Seite nicht freigegeben." : "Vorschlag fehlgeschlagen" + (err?.code ? " (" + err.code + ")" : "") + "."); }
+  render();
+}
+
+/* ---------- Verlauf ---------- */
+function cellHTML(e, ok, grad, cur, title){
+  if (e.exc) return "<span class='cell exc' title='" + esc(title + " · " + e.exc.art) + "'></span>";
+  if (ok) return "<span class='cell full' title='" + esc(title) + "'></span>";
+  const st = grad > 0 ? "background:color-mix(in srgb,var(--good) " + Math.round(15 + grad*55) + "%,transparent);border-color:color-mix(in srgb,var(--good) 40%,var(--line))" : "";
+  return "<span class='cell" + (cur ? " cur" : "") + "' style='" + st + "' title='" + esc(title) + "'></span>";
+}
+function heatmap(ph){
+  const cur = iso(monday(new Date()));
+  const ws = allWeeks().filter(w => phaseFor(w)?.id === ph.id);
+  const hz = goalsOf(ph.id);
+  let h = "<div class='hmwrap'><table class='hm'><thead><tr><th class='rl'>KW</th>" + ws.map(w => "<th><button class='cell' style='border:0;width:auto;color:var(--muted)' data-gow='" + w + "'>" + isoWeek(pd(w))[1] + "</button></th>").join("") + "</tr></thead><tbody>";
+  for (const x of hz){
+    const open = S.openHz.has(x.id);
+    h += "<tr><th class='rl'><button class='btn ghost' style='padding:2px 4px;min-height:0' data-tog='" + esc(x.id) + "' aria-expanded='" + open + "'>" + (open ? "▾ " : "▸ ") + "<span class='sw' style='background:" + esc(x.farbe) + "'></span>" + esc(x.name) + "</button></th>"
+      + ws.map(w => { const e = evalWeek(w); const hh = e.hz.find(y => y.h.id === x.id); return "<td>" + cellHTML(e, hh?.ok, hh?.grad || 0, w >= cur, x.name + " KW " + isoWeek(pd(w))[1] + ": " + (hh ? Math.round(hh.grad*100) + " %" : "–")) + "</td>"; }).join("") + "</tr>";
+    if (open) for (const z of x.subs) h += "<tr><th class='rl subrow'>" + esc(z.bezeichnung) + "</th>" + ws.map(w => { const e = evalWeek(w); const s = e.hz.find(y => y.h.id === x.id)?.subs.find(y => y.z.id === z.id);
+      return "<td>" + cellHTML(e, s?.st === "ok", s?.grad || 0, w >= cur, z.bezeichnung + ": " + (s ? s.ist + " / " + s.ziel : "–")) + "</td>"; }).join("") + "</tr>";
+  }
+  h += "<tr><th class='rl'><b>Gesamt</b></th>" + ws.map(w => { const e = evalWeek(w); return "<td>" + cellHTML(e, e.ok, e.grad, w >= cur, "Gesamt KW " + isoWeek(pd(w))[1] + ": " + Math.round(e.grad*100) + " %") + "</td>"; }).join("") + "</tr>";
+  return h + "</tbody></table></div>";
+}
+function minutesChart(ws, laufZiel){
+  const W = 760, H = 220, L = 40, B = 26, T = 10, R = 10;
+  const data = ws.map(w => { const e = evalWeek(w); const c = {}; e.us.filter(u => u.status === "erledigt").forEach(u => { const k = typInfo(u.typ).kategorie; c[k] = (c[k]||0) + istMin(u); }); return { w, c, tot: Object.values(c).reduce((a,b) => a+b, 0) }; });
+  const max = Math.max(60, ...data.map(d => d.tot), laufZiel || 0); const step = max > 900 ? 300 : max > 400 ? 120 : 60; const top = Math.ceil(max/step)*step;
+  const bw = (W-L-R)/Math.max(1, data.length); const y = v => T + (H-T-B) * (1 - v/top);
+  const catColor = k => (S.D.Typen||[]).find(t => t.kategorie === k)?.farbe || "#9AA39F";
+  let s = "<svg class='chart' viewBox='0 0 " + W + " " + H + "' role='img' aria-label='Trainingsminuten pro Woche'>";
+  for (let v = 0; v <= top; v += step) s += "<line x1='" + L + "' x2='" + (W-R) + "' y1='" + y(v) + "' y2='" + y(v) + "' stroke='var(--line)'/><text x='" + (L-6) + "' y='" + (y(v)+4) + "' text-anchor='end' font-size='10' fill='var(--muted)'>" + (v/60) + "h</text>";
+  data.forEach((d, i) => { let acc = 0; const x = L + i*bw + bw*0.15;
+    Object.entries(d.c).forEach(([k, m]) => { s += "<rect x='" + x + "' y='" + y(acc+m) + "' width='" + (bw*0.7) + "' height='" + Math.max(0, y(acc)-y(acc+m)) + "' fill='" + catColor(k) + "'><title>" + esc(k) + ": " + fmtMin(m) + "</title></rect>"; acc += m; });
+    if (i % Math.ceil(data.length/12) === 0) s += "<text x='" + (x + bw*0.35) + "' y='" + (H-8) + "' text-anchor='middle' font-size='10' fill='var(--muted)'>" + isoWeek(pd(d.w))[1] + "</text>"; });
+  if (laufZiel){ s += "<line x1='" + L + "' x2='" + (W-R) + "' y1='" + y(laufZiel) + "' y2='" + y(laufZiel) + "' stroke='var(--ink)' stroke-dasharray='4 3'/><text x='" + (W-R) + "' y='" + (y(laufZiel)-4) + "' text-anchor='end' font-size='10' fill='var(--ink)'>Laufziel " + fmtMin(laufZiel) + "</text>"; }
+  return s + "</svg>";
+}
+function renderVerlauf(v){
+  const ps = phases(); const ph = ps.find(p => p.id === S.phaseSel) || activePhase(); if (!ph){ v.innerHTML = "<div class='panel'>Keine Phasen angelegt.</div>"; return; }
+  const st = phaseStats(ph); const hz = goalsOf(ph.id);
+  const laufZ = hz.flatMap(h => h.subs).find(z => z.messgroesse === "minuten")?.zielwert;
+  let h = "<section class='spread'><div class='row'><select class='btn' id='phSel'>" + ps.map(p => "<option value='" + esc(p.id) + "'" + (p.id === ph.id ? " selected" : "") + ">" + esc(p.name) + " (" + shortDate(p.start) + "–" + (p.ende ? shortDate(p.ende) : "laufend") + ")</option>").join("") + "</select></div>"
+    + "<div class='row'><button class='btn primary' id='pdfBtn'>PDF für Michi</button></div></section>"
+    + "<div class='panel'><b>" + esc(ph.name) + "</b> <span class='muted'>" + esc(ph.fokus) + "</span></div>";
+  h += "<section class='tiles'>" + hz.map(x => { const s = st.per[x.name]; return "<div class='panel tile' style='--hc:" + esc(x.farbe) + "'><div class='flabel'>" + esc(x.name) + "</div><div class='big num'>" + (ph.status === "aktiv" ? streak(x.name) : s.best) + "</div><div class='small muted'>" + (ph.status === "aktiv" ? "aktuelle Streak · beste " + s.best : "beste Streak") + "</div><div class='small num'>" + s.done + " von " + s.eval + " Wochen erfüllt</div></div>"; }).join("")
+    + "<div class='panel tile' style='--hc:var(--ink)'><div class='flabel'>Gesamt</div><div class='big num'>" + (ph.status === "aktiv" ? streak(null) : st.total.best) + "</div><div class='small muted'>" + (ph.status === "aktiv" ? "aktuelle Streak · beste " + st.total.best : "beste Streak") + "</div><div class='small num'>" + st.total.done + " von " + st.total.eval + " Wochen erfüllt</div></div></section>";
+  h += "<section><h2 style='margin-bottom:8px'>Wochen</h2>" + heatmap(ph) + "<div class='legend' style='margin-top:6px'><span><i class='sw' style='background:var(--good)'></i>erfüllt</span><span><i class='sw' style='background:color-mix(in srgb,var(--good) 40%,transparent)'></i>teilweise</span><span><i class='sw' style='border:1px solid var(--line)'></i>nichts</span><span><i class='sw' style='background:repeating-linear-gradient(135deg,var(--line) 0 2px,transparent 2px 4px)'></i>Ausnahme</span><span><i class='sw' style='border:1px dashed var(--muted)'></i>laufend</span></div></section>";
+  h += "<section class='panel'><h2 style='margin-bottom:8px'>Trainingsminuten pro Woche</h2>" + minutesChart(st.ws, num(laufZ)) + "</section>";
+  h += "<section><h2 style='margin-bottom:8px'>Seit Coaching-Start</h2>" + ps.map(p => "<div style='margin-bottom:12px'><div class='small muted' style='margin-bottom:4px'>" + esc(p.name) + "</div>" + heatmap(p) + "</div>").join("") + "</section>";
+  v.innerHTML = h;
+  $("phSel").onchange = ev => { S.phaseSel = ev.target.value; render(); };
+  $("pdfBtn").onclick = () => openExport(ph);
+  v.querySelectorAll("[data-tog]").forEach(b => b.onclick = () => { const id = b.dataset.tog; S.openHz.has(id) ? S.openHz.delete(id) : S.openHz.add(id); render(); });
+  v.querySelectorAll("[data-gow]").forEach(b => b.onclick = () => { S.week = pd(b.dataset.gow); setView("woche"); });
+}
+
+/* ---------- PDF ---------- */
+function exportData(ph){
+  const st = phaseStats(ph); const hz = goalsOf(ph.id); const cur = iso(monday(new Date()));
+  const ws = st.ws.filter(w => w < cur || ph.status !== "aktiv");
+  const us = unitsIn(ph.start, ph.ende || today());
+  const hours = {}; us.filter(u => u.status === "erledigt").forEach(u => { const k = typInfo(u.typ).kategorie; hours[k] = (hours[k]||0) + istMin(u); });
+  const notable = us.filter(u => (u.kommentar && (u.status === "ausgelassen" || (num(u.gefuehl) && num(u.gefuehl) <= 2))) || (u.kommentar && /schmerz|verletz|kapput|krank|müde/i.test(u.kommentar))).slice(-12);
+  return { ph, st, hz, ws, us, hours, notable };
+}
+function openExport(ph){
+  const x = exportData(ph);
+  openSheet("<h2>PDF für Michi · " + esc(ph.name) + "</h2><p class='small muted'>Enthält Kennzahlen je Hauptziel, Wochenraster, Stunden je Kategorie und auffällige Kommentare. Die Einschätzung unten kannst du vor dem Export anpassen.</p>"
+    + "<div class='field'><label for='xSum'>Einschätzung</label><textarea id='xSum' style='min-height:140px' placeholder='Optional – oder von Claude entwerfen lassen'></textarea></div>"
+    + "<div class='spread'><button class='btn' id='xAi'" + (S.sample ? "" : " disabled") + ">Von Claude entwerfen</button><div class='row'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='xGo'>PDF speichern</button></div></div>", () => {
+      $("cx").onclick = closeSheet;
+      $("xAi").onclick = async () => {
+        const b = $("xAi"); b.disabled = true; b.textContent = "Claude schreibt …";
+        try {
+          const lines = x.hz.map(h => h.name + ": " + x.st.per[h.name].done + "/" + x.st.per[h.name].eval + " Wochen erfüllt; Subziele: " + h.subs.map(z => z.bezeichnung + " " + x.st.subs[z.id].done + "/" + x.st.subs[z.id].eval).join(", ")).join("\n");
+          const r = await S.sample("Schreibe für den Bergführer-Coach Michi eine kurze Einschätzung (4–6 Sätze, Deutsch, sachlich, keine Floskeln) zur Trainingsphase \"" + ph.name + "\" von Kai. Was lief gut, was nicht, und 1–2 Fragen fürs Coaching.\n\nFokus: " + ph.fokus + "\n\nErfüllung:\n" + lines + "\nGesamt: " + x.st.total.done + "/" + x.st.total.eval
+            + "\n\nStunden je Kategorie: " + Object.entries(x.hours).map(([k,m]) => k + " " + fmtMin(m)).join(", ") + "\n\nKommentare (Auszug):\n" + x.us.filter(u => u.kommentar).slice(-25).map(u => u.datum + " " + u.titel + ": " + u.kommentar).join("\n").slice(0, 4000), { modelTier: "default", onText: t => { $("xSum") && ($("xSum").value = t.text); } });
+          $("xSum").value = r.text.trim();
+        } catch (e){ toast("Entwurf fehlgeschlagen" + (e?.code ? " (" + e.code + ")" : "")); }
+        b.disabled = false; b.textContent = "Von Claude entwerfen";
+      };
+      $("xGo").onclick = async () => { const txt = $("xSum").value.trim(); closeSheet(); await makePdf(x, txt); };
+    });
+}
+async function makePdf(x, summary){
+  if (!window.jspdf){ toast("PDF-Bibliothek nicht geladen."); return; }
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit:"mm", format:"a4" }); const M = 14; let y = 16;
+  const hex = h => { const m = String(h).replace("#",""); return [parseInt(m.slice(0,2),16), parseInt(m.slice(2,4),16), parseInt(m.slice(4,6),16)]; };
+  const line = (t, size=10, bold=false, gap=5) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size); const ls = doc.splitTextToSize(t, 182); ls.forEach(l => { if (y > 280){ doc.addPage(); y = 16; } doc.text(l, M, y); y += gap; }); };
+  const ph = x.ph;
+  line("Trainingsbericht Kai Gräff – " + ph.name, 16, true, 7);
+  line(ph.start.split("-").reverse().join(".") + " bis " + (ph.ende ? ph.ende.split("-").reverse().join(".") : "heute") + "  ·  " + x.ws.length + " Wochen", 10, false, 6);
+  line("Fokus: " + ph.fokus, 10, false, 5); y += 2;
+  if (summary){ line("Einschätzung", 12, true, 6); line(summary, 10, false, 5); y += 2; }
+  line("Erfüllung je Hauptziel", 12, true, 6);
+  x.hz.forEach(h => { const s = x.st.per[h.name]; line(h.name + ": " + s.done + " von " + s.eval + " Wochen erfüllt (beste Streak " + s.best + ")", 10, true, 5);
+    h.subs.forEach(z => { const ss = x.st.subs[z.id]; line("   " + z.bezeichnung + " (" + (z.messgroesse === "minuten" ? z.zielwert + " min" : z.zielwert + "×") + "/Woche): " + ss.done + "/" + ss.eval, 9, false, 4.5); }); });
+  line("Gesamt: " + x.st.total.done + " von " + x.st.total.eval + " Wochen alle Ziele erfüllt (beste Streak " + x.st.total.best + ")", 10, true, 6); y += 2;
+  // grid
+  if (y > 230){ doc.addPage(); y = 16; }
+  line("Wochenraster", 12, true, 6);
+  const cw = Math.min(8, (182-34)/Math.max(1, x.ws.length)); const rows = [...x.hz.map(h => ({ name: h.name, f: e => { const hh = e.hz.find(q => q.h.id === h.id); return [hh?.ok, hh?.grad||0]; } })), { name:"Gesamt", f: e => [e.ok, e.grad] }];
+  doc.setFontSize(7); x.ws.forEach((w,i) => doc.text(String(isoWeek(pd(w))[1]), M+34+i*cw+cw/2, y, { align:"center" })); y += 2;
+  rows.forEach(r => { doc.setFontSize(9); doc.text(r.name, M, y+4);
+    x.ws.forEach((w,i) => { const e = evalWeek(w); const [ok, g] = r.f(e); const X = M+34+i*cw, Y = y;
+      if (e.exc){ doc.setFillColor(220,220,220); doc.rect(X, Y, cw-1, 5, "F"); }
+      else if (ok){ doc.setFillColor(47,138,78); doc.rect(X, Y, cw-1, 5, "F"); }
+      else { const t = Math.round(255 - g*120); doc.setFillColor(t, 255 - Math.round(g*60), t); doc.rect(X, Y, cw-1, 5, "F"); doc.setDrawColor(200,205,202); doc.rect(X, Y, cw-1, 5, "S"); } });
+    y += 7; });
+  doc.setFontSize(8); doc.text("grün = erfüllt · hellgrün = teilweise · grau = Ausnahmewoche (krank/Urlaub/Tour)", M, y+1); y += 8;
+  line("Stunden je Kategorie", 12, true, 6);
+  const tot = Object.values(x.hours).reduce((a,b) => a+b, 0) || 1; const mx = Math.max(...Object.values(x.hours), 1);
+  Object.entries(x.hours).sort((a,b) => b[1]-a[1]).forEach(([k,m]) => { if (y > 280){ doc.addPage(); y = 16; } doc.setFontSize(9); doc.text(k, M, y+3.5);
+    const c = (S.D.Typen||[]).find(t => t.kategorie === k)?.farbe || "#9AA39F"; doc.setFillColor(...hex(c)); doc.rect(M+42, y, 110*m/mx, 4.5, "F"); doc.text(fmtMin(m) + " (" + Math.round(m/tot*100) + " %)", M+42+110*m/mx+2, y+3.5); y += 6.5; });
+  y += 2;
+  if (x.notable.length){ line("Auffällige Kommentare", 12, true, 6); x.notable.forEach(u => line(u.datum.split("-").reverse().join(".") + " · " + u.titel + " (" + u.status + "): " + u.kommentar, 9, false, 4.5)); }
+  const blob = doc.output("blob"); const fn = "Trainingsbericht_" + ph.name.replace(/[^\wäöüÄÖÜ-]+/g, "_") + "_" + today() + ".pdf";
+  if (!S.dl){ toast("Download ist in dieser Ansicht nicht verfügbar."); return; }
+  try { await S.dl.save({ filename: fn, data: blob }); toast("PDF gespeichert"); }
+  catch (e){ toast(e?.code === "declined" ? "Download abgebrochen" : "PDF konnte nicht gespeichert werden" + (e?.code ? " (" + e.code + ")" : "")); }
+}
+
+/* ---------- Leistung ---------- */
+function parseMess(b){ return list(b.messwerte).map(s => { const i = s.indexOf(":"); return { k: s.slice(0, i).trim(), unit: s.slice(i+1).trim() }; }); }
+function benchFieldsHTML(b){ return "<div class='panel' style='padding:10px'><b>" + esc(b.name) + "</b><div class='md small' style='margin:6px 0'>" + md(b.protokoll) + "</div><div class='g2'>" + parseMess(b).map(m => "<div class='field'><label for='bm_" + esc(m.k) + "'>" + esc(m.k.replace(/_/g," ")) + " [" + esc(m.unit) + "]</label><input id='bm_" + esc(m.k) + "' " + (m.unit === "mm:ss" ? "placeholder='19:39'" : "inputmode='decimal'") + "></div>").join("") + "<div class='field'><label for='bm_bed'>Bedingungen</label><input id='bm_bed' placeholder='z.B. müde, Laufband'></div></div></div>"; }
+function readBench(b){ const w = {}; for (const m of parseMess(b)){ const raw = ($("bm_" + m.k)?.value || "").trim(); if (!raw) continue; if (m.unit === "mm:ss"){ const [mm, ss] = raw.split(":").map(Number); w[m.k] = (mm||0)*60 + (ss||0); } else w[m.k] = num(raw); }
+  return Object.keys(w).length ? { werte: w, bed: ($("bm_bed")?.value || "").trim() } : null; }
+async function saveBenchResult(b, res, u){
+  const r = { id: rid("R-"), benchmark_id: b.id, datum: u?.datum || today(), hauptwert: res.werte[b.hauptwert] ?? "", werte: JSON.stringify(res.werte), bedingungen: res.bed, kommentar: u?.kommentar || "", einheit_id: u?.id || "", quelle: "dashboard" };
+  S.D.Benchmark_Ergebnisse.push(r);
+  if (await guarded("Benchmark speichern fehlgeschlagen", () => appendRow("Benchmark_Ergebnisse", r))) toast("Benchmark gespeichert");
+}
+function spark(b, rs){
+  if (rs.length < 2) return "";
+  const W = 260, H = 60, P = 6; const vs = rs.map(r => num(r.hauptwert)); const mn = Math.min(...vs), mx = Math.max(...vs); const rng = mx - mn || 1;
+  const t0 = pd(rs[0].datum).getTime(), t1 = pd(rs.at(-1).datum).getTime() || t0 + 1;
+  const pts = rs.map(r => [P + (W-2*P) * ((pd(r.datum).getTime()-t0)/Math.max(1, t1-t0)), P + (H-2*P) * (b.richtung === "niedriger_besser" ? (num(r.hauptwert)-mn)/rng : 1 - (num(r.hauptwert)-mn)/rng)]);
+  const ph = phases().filter(p => p.start > rs[0].datum && p.start <= rs.at(-1).datum).map(p => P + (W-2*P) * ((pd(p.start).getTime()-t0)/Math.max(1,t1-t0)));
+  return "<svg class='chart' viewBox='0 0 " + W + " " + H + "' style='max-width:320px' role='img' aria-label='Verlauf " + esc(b.name) + "'>" + ph.map(x => "<line x1='" + x + "' x2='" + x + "' y1='0' y2='" + H + "' stroke='var(--line)' stroke-dasharray='2 2'/>").join("")
+    + "<polyline fill='none' stroke='var(--info)' stroke-width='2' points='" + pts.map(p => p.join(",")).join(" ") + "'/>" + pts.map((p,i) => "<circle cx='" + p[0] + "' cy='" + p[1] + "' r='" + (i === pts.length-1 ? 4 : 2.5) + "' fill='" + (i === pts.length-1 ? "var(--accent)" : "var(--info)") + "'/>").join("") + "<text x='" + (W-P) + "' y='" + (H-1) + "' text-anchor='end' font-size='9' fill='var(--muted)'>" + (b.richtung === "niedriger_besser" ? "oben = schneller" : "oben = besser") + "</text></svg>";
+}
+const fmtHW = (b, v) => b.hauptwert === "zeit" ? fmtSec(num(v)) : (num(v) + " " + (parseMess(b).find(m => m.k === b.hauptwert)?.unit || ""));
+function renderLeistung(v){
+  const bs = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein");
+  let h = "<section class='spread'><h2>Lauf-Benchmarks</h2><span class='small muted'>" + esc(cfg("laktat_schwelle1")) + " · " + esc(cfg("laktat_schwelle2")) + "</span></section><section class='hzgrid'>";
+  h += bs.map(b => { const s = benchStatus(b); const first = s.rs[0], last = s.last, prev = s.rs.at(-2);
+    const better = (a, c) => b.richtung === "niedriger_besser" ? num(a) < num(c) : num(a) > num(c);
+    const delta = (ref) => { if (!ref || !last) return ""; const d = num(last.hauptwert) - num(ref.hauptwert); if (!d) return "±0"; const txt = b.hauptwert === "zeit" ? (d > 0 ? "+" : "−") + fmtSec(Math.abs(d)) : (d > 0 ? "+" : "") + Math.round(d*10)/10; return "<span style='color:" + (better(last.hauptwert, ref.hauptwert) ? "var(--good)" : "var(--bad)") + "'>" + txt + "</span>"; };
+    return "<div class='panel hz' style='--hc:" + (s.isDue ? "var(--accent)" : "var(--info)") + "'><div class='top'><h3>" + esc(b.name) + "</h3>" + (s.isDue ? "<span class='pill miss'>fällig</span>" : "<span class='pill neutral'>fällig " + shortDate(s.due) + "</span>") + "</div>"
+      + (last ? "<div class='total'><span class='big num'>" + fmtHW(b, last.hauptwert) + "</span><span class='small muted'>am " + shortDate(last.datum) + "</span></div><div class='small'>zum letzten: " + delta(prev) + " · zum ersten: " + delta(first) + "</div>" : "<div class='muted'>Noch kein Ergebnis.</div>")
+      + spark(b, s.rs) + "<div class='row'><button class='btn' data-bnew='" + esc(b.id) + "'>Ergebnis eintragen</button><button class='btn ghost' data-bplan='" + esc(b.id) + "'>Einplanen</button></div></div>"; }).join("");
+  h += "</section>";
+  const cur = monday(new Date()); const ws = Array.from({length:16}, (_, i) => iso(addDays(cur, -7*(15-i))));
+  const rd = ws.map(w => { const e = evalWeek(w); const r = e.us.filter(u => u.status === "erledigt" && typInfo(u.typ).kategorie === "Laufen-Ausdauer"); return { w, ga: r.filter(u => u.typ === "GA1").reduce((a,u) => a+istMin(u),0), iv: r.filter(u => u.typ === "Intervall").reduce((a,u) => a+istMin(u),0), other: r.filter(u => u.typ !== "GA1" && u.typ !== "Intervall").reduce((a,u) => a+istMin(u),0) }; });
+  const W = 760, H = 200, L = 40, B = 24, T = 10; const mx = Math.max(60, ...rd.map(d => d.ga+d.iv+d.other)); const top = Math.ceil(mx/60)*60; const bw = (W-L-10)/rd.length; const y = val => T + (H-T-B)*(1 - val/top);
+  let svg = "<svg class='chart' viewBox='0 0 " + W + " " + H + "' role='img' aria-label='Laufminuten pro Woche'>";
+  for (let val = 0; val <= top; val += 60) svg += "<line x1='" + L + "' x2='" + (W-10) + "' y1='" + y(val) + "' y2='" + y(val) + "' stroke='var(--line)'/><text x='" + (L-6) + "' y='" + (y(val)+4) + "' text-anchor='end' font-size='10' fill='var(--muted)'>" + val/60 + "h</text>";
+  rd.forEach((d,i) => { const x = L + i*bw + bw*.15; let acc = 0; [["ga","#3B78C4","GA1"],["iv","#C9433B","Intervall"],["other","#8FB0D8","Sonstiges Laufen"]].forEach(([k,c,n]) => { if (!d[k]) return; svg += "<rect x='" + x + "' y='" + y(acc+d[k]) + "' width='" + bw*.7 + "' height='" + (y(acc)-y(acc+d[k])) + "' fill='" + c + "'><title>" + n + ": " + fmtMin(d[k]) + "</title></rect>"; acc += d[k]; });
+    svg += "<text x='" + (x+bw*.35) + "' y='" + (H-8) + "' text-anchor='middle' font-size='10' fill='var(--muted)'>" + isoWeek(pd(d.w))[1] + "</text>"; });
+  const lz = goalsOf(activePhase()?.id).flatMap(h => h.subs).find(z => z.messgroesse === "minuten" && /lauf/i.test(z.filter_werte));
+  if (lz){ const val = num(lz.zielwert); svg += "<line x1='" + L + "' x2='" + (W-10) + "' y1='" + y(val) + "' y2='" + y(val) + "' stroke='var(--ink)' stroke-dasharray='4 3'/><text x='" + (W-10) + "' y='" + (y(val)-4) + "' text-anchor='end' font-size='10' fill='var(--ink)'>Ziel " + fmtMin(val) + "</text>"; }
+  h += "<section class='panel'><h2 style='margin-bottom:8px'>Laufen – letzte 16 Wochen</h2>" + svg + "</svg><div class='legend'><span><i class='sw' style='background:#3B78C4'></i>GA1</span><span><i class='sw' style='background:#C9433B'></i>Intervall</span><span><i class='sw' style='background:#8FB0D8'></i>Sonstiges Laufen</span></div></section>";
+  v.innerHTML = h;
+  v.querySelectorAll("[data-bnew]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bnew);
+    openSheet("<h2>Ergebnis eintragen</h2><div class='field'><label for='bDate'>Datum</label><input type='date' id='bDate' value='" + today() + "'></div>" + benchFieldsHTML(b) + "<div class='field'><label for='bKom'>Kommentar</label><textarea id='bKom'></textarea></div><div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='bOk'>Speichern</button></div>", () => {
+      $("cx").onclick = closeSheet; $("bOk").onclick = async () => { const res = readBench(b); if (!res){ toast("Bitte mindestens einen Messwert eintragen."); return; } const d = $("bDate").value || today(), k = $("bKom").value.trim(); closeSheet(); await saveBenchResult(b, res, { datum: d, kommentar: k }); }; }); });
+  v.querySelectorAll("[data-bplan]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bplan); openAdd(today(), b.vorlage_id); });
+}
+
+/* ---------- Ziele & Phasen ---------- */
+function renderZiele(v){
+  const ps = phases(); const ph = ps.find(p => p.id === S.phaseSel) || activePhase();
+  if (!ph){ v.innerHTML = "<div class='panel'>Keine Phase vorhanden.</div>"; return; }
+  const hz = goalsOf(ph.id);
+  const typs = (S.D.Typen||[]).map(t => t.typ), cats = [...new Set((S.D.Typen||[]).map(t => t.kategorie))];
+  let h = "<section class='spread'><select class='btn' id='zPh'>" + ps.map(p => "<option value='" + esc(p.id) + "'" + (p.id === ph.id ? " selected" : "") + ">" + esc(p.name) + (p.status === "aktiv" ? " (aktiv)" : "") + "</option>").join("") + "</select><button class='btn primary' id='newPh'>Neue Phase nach Coaching</button></section>";
+  h += "<div class='panel'><div class='g2'><div class='field'><label for='pName'>Name</label><input id='pName' value='" + esc(ph.name) + "'></div><div class='g2'><div class='field'><label for='pStart'>Start</label><input type='date' id='pStart' value='" + esc(ph.start) + "'></div><div class='field'><label for='pEnde'>Ende</label><input type='date' id='pEnde' value='" + esc(ph.ende) + "'></div></div></div>"
+    + "<div class='field'><label for='pFokus'>Fokus</label><input id='pFokus' value='" + esc(ph.fokus) + "'></div><div class='field'><label for='pNot'>Coaching-Notizen</label><textarea id='pNot'>" + esc(ph.coaching_notizen) + "</textarea></div>"
+    + (ph.coaching_link ? "<a href='" + esc(ph.coaching_link) + "' target='_blank' rel='noopener'>Coaching-Notizen in Notion ↗</a>" : "") + "</div>";
+  h += hz.map(x => "<div class='panel hz' style='--hc:" + esc(x.farbe) + "' data-hz='" + esc(x.id) + "'><div class='spread'><input class='btn' style='font-family:var(--display);font-size:18px;font-weight:600' data-hzname value='" + esc(x.name) + "' aria-label='Name Hauptziel'><button class='btn ghost danger' data-hzdel>Hauptziel entfernen</button></div>"
+    + x.subs.map(z => zRowHTML(z, typs, cats)).join("") + "<button class='btn' data-zadd>+ Subziel</button></div>").join("");
+  h += "<div class='row'><button class='btn' id='hzAdd'>+ Hauptziel</button><span style='flex:1'></span><button class='btn primary' id='zSave'>Phase & Ziele speichern</button></div>"
+    + "<p class='small muted'>Eine Einheit zählt für ein Subziel, wenn ihr Typ (oder die Kategorie ihres Typs) in der Liste steht. Ein Hauptziel ist erfüllt, wenn alle Subziele erfüllt sind. Gesamt ist erfüllt, wenn alle Hauptziele erfüllt sind.</p>";
+  v.innerHTML = h;
+  const wireRows = () => v.querySelectorAll("[data-zdel]").forEach(b => b.onclick = () => b.closest(".zrow").remove());
+  wireRows();
+  $("zPh").onchange = ev => { S.phaseSel = ev.target.value; render(); };
+  v.querySelectorAll("[data-zadd]").forEach(b => b.onclick = () => { b.insertAdjacentHTML("beforebegin", zRowHTML({ id:"", bezeichnung:"", messgroesse:"anzahl", zielwert:1, filter_ebene:"typ", filter_werte:"" }, typs, cats)); wireRows(); });
+  v.querySelectorAll("[data-hzdel]").forEach(b => b.onclick = () => { if (b.dataset.sure !== "1"){ b.dataset.sure = "1"; b.textContent = "Wirklich entfernen?"; return; } b.closest("[data-hz]").remove(); });
+  $("hzAdd").onclick = () => {
+    $("hzAdd").parentElement.insertAdjacentHTML("beforebegin", "<div class='panel hz' style='--hc:#5E7A6E' data-hz=''><div class='spread'><input class='btn' style='font-family:var(--display);font-size:18px;font-weight:600' data-hzname placeholder='z.B. Beine' aria-label='Name Hauptziel'><button class='btn ghost danger' data-hzdel>Entfernen</button></div><button class='btn' data-zadd>+ Subziel</button></div>");
+    const box = $("hzAdd").parentElement.previousElementSibling;
+    box.querySelector("[data-zadd]").onclick = ev => { ev.target.insertAdjacentHTML("beforebegin", zRowHTML({ id:"", bezeichnung:"", messgroesse:"anzahl", zielwert:1, filter_ebene:"typ", filter_werte:"" }, typs, cats)); wireRows(); };
+    box.querySelector("[data-hzdel]").onclick = () => box.remove();
+  };
+  v.addEventListener("change", ev => { const sel = ev.target.closest("[data-f='filter_ebene']"); if (sel) sel.closest(".zrow").querySelector("[data-f='filter_werte']").setAttribute("list", sel.value === "kategorie" ? "dl_k" : "dl_t"); });
+  $("newPh").onclick = () => openNewPhase(ph);
+  $("zSave").onclick = () => saveGoals(ph, v);
+}
+function zRowHTML(z, typs, cats){
+  const opts = (z.filter_ebene === "kategorie" ? cats : typs);
+  return "<div class='zrow' data-z='" + esc(z.id) + "'><div class='field'><label>Subziel</label><input data-f='bezeichnung' value='" + esc(z.bezeichnung) + "'></div>"
+    + "<div class='field'><label>Messen</label><select data-f='messgroesse'><option value='anzahl'" + (z.messgroesse !== "minuten" ? " selected" : "") + ">Anzahl ×</option><option value='minuten'" + (z.messgroesse === "minuten" ? " selected" : "") + ">Minuten</option></select></div>"
+    + "<div class='field'><label>Pro Woche</label><input data-f='zielwert' type='number' min='1' inputmode='numeric' value='" + esc(z.zielwert) + "'></div>"
+    + "<div class='field'><label>Zählt: " + "<select data-f='filter_ebene' style='min-height:0;padding:0 4px;width:auto;display:inline-block'><option value='typ'" + (z.filter_ebene !== "kategorie" ? " selected" : "") + ">Typen</option><option value='kategorie'" + (z.filter_ebene === "kategorie" ? " selected" : "") + ">Kategorien</option></select></label><input data-f='filter_werte' value='" + esc(z.filter_werte) + "' list='dl_" + (z.filter_ebene === "kategorie" ? "k" : "t") + "' placeholder='kommagetrennt'></div>"
+    + "<button class='btn ghost danger' data-zdel aria-label='Subziel entfernen'>✕</button>"
+    + "<datalist id='dl_t'>" + typs.map(t => "<option value='" + esc(t) + "'>").join("") + "</datalist><datalist id='dl_k'>" + cats.map(t => "<option value='" + esc(t) + "'>").join("") + "</datalist></div>";
+}
+async function saveGoals(ph, v){
+  const btn = $("zSave"); btn.disabled = true; btn.textContent = "Speichere …";
+  const ok = await guarded("Speichern fehlgeschlagen", async () => {
+    Object.assign(ph, { name: $("pName").value.trim() || ph.name, start: $("pStart").value || ph.start, ende: $("pEnde").value, fokus: $("pFokus").value.trim(), coaching_notizen: $("pNot").value.trim() });
+    await updateRow("Phasen", ph);
+    const keepHz = new Set(), keepZ = new Set();
+    let hi = 0;
+    for (const box of v.querySelectorAll("[data-hz]")){
+      hi++; const name = box.querySelector("[data-hzname]").value.trim(); if (!name) continue;
+      let h = (S.D.Hauptziele||[]).find(x => x.id === box.dataset.hz);
+      if (h){ h.name = name; h.reihenfolge = hi; await updateRow("Hauptziele", h); }
+      else { h = { id: rid("H-",6), phase_id: ph.id, name, farbe: ({Klettern:"#C24A3A", Laufen:"#3B78C4", Beine:"#5E7A6E"})[name] || "#7A6FA8", reihenfolge: hi }; S.D.Hauptziele.push(h); await appendRow("Hauptziele", h); }
+      keepHz.add(h.id); let zi = 0;
+      for (const row of box.querySelectorAll(".zrow")){
+        zi++; const f = k => row.querySelector("[data-f='" + k + "']").value.trim();
+        if (!f("bezeichnung")) continue;
+        const data = { phase_id: ph.id, hauptziel_id: h.id, bezeichnung: f("bezeichnung"), messgroesse: f("messgroesse"), zielwert: Math.max(1, num(f("zielwert"))), filter_ebene: f("filter_ebene"), filter_werte: list(f("filter_werte")).join(", "), reihenfolge: zi };
+        let z = (S.D.Ziele||[]).find(x => x.id === row.dataset.z);
+        if (z){ Object.assign(z, data); await updateRow("Ziele", z); } else { z = Object.assign({ id: rid("Z-",6) }, data); S.D.Ziele.push(z); await appendRow("Ziele", z); }
+        keepZ.add(z.id);
+      }
+    }
+    for (const z of (S.D.Ziele||[]).filter(z => z.phase_id === ph.id && !keepZ.has(z.id))){ await clearRow("Ziele", z.id); }
+    for (const h of (S.D.Hauptziele||[]).filter(h => h.phase_id === ph.id && !keepHz.has(h.id))){ await clearRow("Hauptziele", h.id); }
+    S.D.Ziele = S.D.Ziele.filter(z => z.phase_id !== ph.id || keepZ.has(z.id)); S.D.Hauptziele = S.D.Hauptziele.filter(h => h.phase_id !== ph.id || keepHz.has(h.id));
+  });
+  if (ok) toast("Phase und Ziele gespeichert");
+}
+function openNewPhase(prev){
+  openSheet("<h2>Neue Phase starten</h2><p class='small muted'>Die Ziele von „" + esc(prev.name) + "“ werden übernommen und lassen sich danach unter „Ziele“ anpassen. Die aktuelle Phase wird am Vortag abgeschlossen.</p>"
+    + "<div class='g2'><div class='field'><label for='nName'>Name</label><input id='nName' placeholder='z.B. Frühling 2027'></div><div class='field'><label for='nStart'>Start (Coaching-Tag)</label><input type='date' id='nStart' value='" + today() + "'></div></div>"
+    + "<div class='field'><label for='nFokus'>Fokus</label><input id='nFokus'></div><div class='field'><label for='nNot'>Coaching-Notizen</label><textarea id='nNot'></textarea></div><div class='field'><label for='nLink'>Link zu den Notizen (optional)</label><input id='nLink' inputmode='url'></div>"
+    + "<div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='nOk'>Phase starten</button></div>", () => {
+      $("cx").onclick = closeSheet;
+      $("nOk").onclick = async () => {
+        const start = $("nStart").value; const name = $("nName").value.trim(); if (!start || !name){ toast("Name und Start angeben."); return; }
+        const nid = "P-" + pad(Math.max(0, ...phases().map(p => num(String(p.id).replace(/\D/g,"")))) + 1);
+        const np = { id: nid, name, start, ende: "", fokus: $("nFokus").value.trim(), coaching_notizen: $("nNot").value.trim(), coaching_link: $("nLink").value.trim(), status: "aktiv" };
+        closeSheet();
+        const ok = await guarded("Phase anlegen fehlgeschlagen", async () => {
+          const old = phases().filter(p => p.status === "aktiv");
+          for (const p of old){ p.status = "abgeschlossen"; if (!p.ende || p.ende >= start) p.ende = addDaysIso(start, -1); await updateRow("Phasen", p); }
+          S.D.Phasen.push(np); await appendRow("Phasen", np);
+          for (const h of goalsOf(prev.id)){
+            const nh = { id: rid("H-",6), phase_id: nid, name: h.name, farbe: h.farbe, reihenfolge: h.reihenfolge }; S.D.Hauptziele.push(nh); await appendRow("Hauptziele", nh);
+            for (const z of h.subs){ const nz = { id: rid("Z-",6), phase_id: nid, hauptziel_id: nh.id, bezeichnung: z.bezeichnung, messgroesse: z.messgroesse, zielwert: z.zielwert, filter_ebene: z.filter_ebene, filter_werte: z.filter_werte, reihenfolge: z.reihenfolge }; S.D.Ziele.push(nz); await appendRow("Ziele", nz); }
+          }
+        });
+        if (ok){ S.phaseSel = nid; toast("Phase „" + name + "“ gestartet"); render(); openExport(prev); }
+      };
+    });
+}
+
+/* ---------- Vorlagen ---------- */
+function renderVorlagen(v){
+  const vs = S.D.Vorlagen || []; const cats = [...new Set(vs.map(x => typInfo(x.typ).kategorie))];
+  let h = "<section class='spread'><h2>Vorlagen</h2><div class='row'><a class='btn' href='" + SHEET_URL + "' target='_blank' rel='noopener'>Sheet öffnen ↗</a><button class='btn primary' id='vNew'>+ Vorlage</button></div></section>";
+  h += cats.map(k => "<section><div class='flabel' style='margin:6px 0'>" + esc(k) + "</div><div class='vlist'>" + vs.filter(x => typInfo(x.typ).kategorie === k).map(x => "<button class='vbtn' data-ved='" + esc(x.id) + "' style='--cc:" + typColor(x.typ) + ";" + (x.aktiv === "nein" ? "opacity:.5" : "") + "'><div style='flex:1;min-width:0'><b>" + esc(x.name) + "</b> <span class='small muted num'>" + esc(x.typ) + (x.dauer_standard_min ? " · " + x.dauer_standard_min + " min" : "") + "</span><small>" + esc(x.kurzbeschreibung) + "</small></div></button>").join("") + "</div></section>").join("");
+  v.innerHTML = h;
+  v.querySelectorAll("[data-ved]").forEach(b => b.onclick = () => editVorlage(vs.find(x => x.id === b.dataset.ved)));
+  $("vNew").onclick = () => editVorlage(null);
+}
+function editVorlage(x){
+  const isNew = !x; x = x || { id: rid("V-",5), name:"", typ:"GA1", dauer_standard_min:"", kurzbeschreibung:"", anleitung:"", anleitung_link:"", aktualisiert_am: today(), aktiv:"ja" };
+  openSheet("<h2>" + (isNew ? "Neue Vorlage" : esc(x.name)) + "</h2><div class='g2'><div class='field'><label for='vName'>Name</label><input id='vName' value='" + esc(x.name) + "'></div><div class='field'><label for='vTyp'>Typ</label><select id='vTyp'>" + typOptions(x.typ) + "</select></div></div>"
+    + "<div class='g2'><div class='field'><label for='vDauer'>Standarddauer [min]</label><input id='vDauer' type='number' min='0' inputmode='numeric' value='" + esc(x.dauer_standard_min) + "'></div><div class='field'><span class='flabel'>Aktiv</span>" + segHTML("vAkt", [["ja","Ja"],["nein","Nein"]], x.aktiv || "ja") + "</div></div>"
+    + "<div class='field'><label for='vKurz'>Kurzbeschreibung</label><input id='vKurz' value='" + esc(x.kurzbeschreibung) + "'></div>"
+    + "<div class='field'><label for='vAnl'>Anleitung (mit Michi festgelegt; Zeilen mit „- “ werden Aufzählungen)</label><textarea id='vAnl' style='min-height:160px'>" + esc(x.anleitung) + "</textarea></div>"
+    + "<div class='field'><label for='vLink'>Link</label><input id='vLink' inputmode='url' value='" + esc(x.anleitung_link) + "'></div>"
+    + "<div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='vOk'>Speichern</button></div>", sh => {
+      wireSegs(sh); $("cx").onclick = closeSheet;
+      $("vOk").onclick = async () => {
+        Object.assign(x, { name: $("vName").value.trim() || "Vorlage", typ: $("vTyp").value, dauer_standard_min: $("vDauer").value === "" ? "" : Number($("vDauer").value), kurzbeschreibung: $("vKurz").value.trim(), anleitung: $("vAnl").value, anleitung_link: $("vLink").value.trim(), aktiv: segVal("vAkt"), aktualisiert_am: today() });
+        closeSheet();
+        if (isNew){ S.D.Vorlagen.push(x); if (await guarded("Speichern fehlgeschlagen", () => appendRow("Vorlagen", x))) toast("Vorlage angelegt"); }
+        else if (await guarded("Speichern fehlgeschlagen", () => updateRow("Vorlagen", x))) toast("Vorlage gespeichert");
+      };
+    });
+}
+
+/* ---------- boot ---------- */
+const h0 = location.hash.slice(1); if (["woche","verlauf","leistung","ziele","vorlagen"].includes(h0)) S.view = h0;
+render();
+(async () => {
+  const c = window.claude;
+  const [mcp, sample, dl] = await Promise.all([c?.use?.("mcp").catch(() => null), c?.use?.("sample").catch(() => null), c?.use?.("downloads").catch(() => null)]);
+  S.mcp = mcp || null; S.sample = sample || null; S.dl = dl || null;
+  if (!S.mcp){ $("view").innerHTML = "<div class='panel'><b>Keine Verbindung zu Google.</b> Öffne das Dashboard in claude.ai und erlaube den Zugriff auf Google Sheets und Google Calendar. Die Daten liegen in <a href='" + SHEET_URL + "' target='_blank' rel='noopener'>Trainingsplan 2.0</a>.</div>"; return; }
+  loadAll(false);
+})();
+})();
+</script>
