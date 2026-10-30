@@ -137,11 +137,21 @@ a{color:var(--info)}
 .mkw{border:0;border-bottom:1px solid var(--line);background:transparent;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
 .mkw:hover{color:var(--ink)}
 .mkw .cell{width:14px;height:14px}
+.mkw .kwd{font-size:10px}
+.mkw .kwt{font-size:10px;font-weight:600;color:var(--hl);text-transform:uppercase;letter-spacing:.05em}
+.mkw.next{color:var(--hl)}
+.mkw.cur{color:var(--ink);font-weight:600}
+.mday.nextw{background:color-mix(in srgb,var(--hl) 5%,var(--bg))}
+.mday.past .mdn{color:var(--muted)}
+.mdn small{font-size:10px;font-weight:400;color:var(--muted)}
+.mdh{justify-content:space-between}
+.mplus{border:0;background:transparent;color:var(--muted);padding:0 4px;font-size:14px;line-height:1;opacity:0}
+.mday:hover .mplus,.mplus:focus-visible{opacity:1}
+.mplus:hover{color:var(--hl)}
+@media (hover:none){.mplus{opacity:1}}
 .mday{border-left:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 4px 6px;min-height:96px;min-width:0;display:flex;flex-direction:column;gap:2px}
-.mday.out{background:var(--sunk)}
-.mday.out .mdn{color:var(--muted)}
 .mday.over{background:color-mix(in srgb,var(--hl) 10%,var(--bg))}
-.mdh{display:flex}
+.mdh{display:flex;align-items:center}
 .mdn{border:0;background:transparent;padding:0 2px;font-weight:600;font-size:12px;min-width:20px;text-align:left}
 .mdn:hover{color:var(--hl)}
 .mday.today .mdn{color:var(--bg);background:var(--hl);border-radius:2px;text-align:center}
@@ -152,6 +162,9 @@ a{color:var(--info)}
 .mchip:hover{border-color:var(--ink);border-left-color:var(--cc)}
 @media (max-width:700px){
   .mcal{grid-template-columns:24px repeat(7,minmax(0,1fr))}
+  .mkw .kwd{display:none}
+  .mdn small{display:none}
+  .mplus{display:none}
   .mday{min-height:64px;padding:2px}
   .mchip{height:7px;padding:0;border-left-width:0;background:var(--cc)}
   .mchip.geplant{background:transparent;border:1px solid var(--cc)}
@@ -302,7 +315,7 @@ function banner(text, allow){
 }
 
 /* ---------- state ---------- */
-const S = { mcp:null, sample:null, dl:null, D:{}, H:{}, loaded:false, view:"woche", week:monday(new Date()), month:new Date(new Date().getFullYear(), new Date().getMonth(), 1), phaseSel:null, busy:new Set(), drafts:[], openHz:new Set(), fresh:null };
+const S = { mcp:null, sample:null, dl:null, D:{}, H:{}, loaded:false, view:"woche", week:monday(new Date()), calWeeks:8, phaseSel:null, busy:new Set(), drafts:[], openHz:new Set(), fresh:null };
 const today = () => iso(new Date());
 const cfg = k => (S.D.Config||[]).find(r => r.schluessel === k)?.wert || "";
 
@@ -783,36 +796,37 @@ function minutesChart(ws){
   data.forEach((d, i) => { if (i > 0 && !d.label.endsWith("*")) d.delta = d.ac - data[i-1].ac; });
   return ibcsColumns(data, { fmt: hm, deltaFmt: v => (v > 0 ? "+" : "−") + hm(Math.abs(v)), aria: "Trainingszeit pro Woche" });
 }
-/* ---------- Monatskalender ---------- */
+/* ---------- Kalender: nächste Woche oben, dann rückwärts ---------- */
 function renderKalender(v){
-  const m0 = S.month, y = m0.getFullYear(), mo = m0.getMonth(), first = iso(m0), last = iso(new Date(y, mo + 1, 0));
-  const mName = m0.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
-  const start = monday(m0), end = addDays(monday(new Date(y, mo + 1, 0)), 6);
-  const all = (S.D.Einheiten||[]).filter(u => u.status !== "geloescht" && u.datum >= iso(start) && u.datum <= iso(end));
-  const inM = all.filter(u => u.datum >= first && u.datum <= last), done = inM.filter(u => u.status === "erledigt");
-  const min = done.reduce((a,u) => a + istMin(u), 0), km = done.filter(isRun).reduce((a,u) => a + num(u.distanz_km), 0), hmS = done.reduce((a,u) => a + hmOf(u), 0);
-  const plan = inM.filter(u => u.status === "geplant").length;
-  let h = "<section class='wkhead'><div class='row'><button class='btn' id='mPrev' aria-label='Vorheriger Monat'>‹</button><button class='btn' id='mNow'>Heute</button><button class='btn' id='mNext' aria-label='Nächster Monat'>›</button></div><h2>" + esc(mName) + "</h2></section>";
-  h += "<p class='msg' style='margin:0'><b>" + done.length + " Einheiten</b> erledigt, " + hm(min) + " h Training" + (km ? ", " + fmtKm(km) + " km" : "") + (hmS ? ", " + fmtInt(hmS) + " hm" : "") + "." + (plan ? " <span class='hl'>" + plan + " geplant.</span>" : "") + "</p>";
+  const curW = monday(new Date()), n = S.calWeeks || 8;
+  const weeks = Array.from({length: n}, (_, i) => addDays(curW, 7 * (1 - i)));
+  const from = iso(weeks.at(-1)), to = addDaysIso(iso(weeks[0]), 6);
+  const all = (S.D.Einheiten||[]).filter(u => u.status !== "geloescht" && u.datum >= from && u.datum <= to);
+  const inW = w => all.filter(u => u.datum >= w && u.datum <= addDaysIso(w, 6));
+  const cw = inW(iso(curW)), nw = inW(iso(weeks[0]));
+  const cDone = cw.filter(u => u.status === "erledigt"), cPlan = cw.filter(u => u.status === "geplant"), nPlan = nw.filter(u => u.status === "geplant");
+  let h = "<p class='msg' style='margin:0'><b>Diese Woche " + cDone.length + (cDone.length === 1 ? " Einheit</b>" : " Einheiten</b>") erledigt (" + hm(cDone.reduce((a,u) => a + istMin(u), 0)) + " h)" + (cPlan.length ? ", " + cPlan.length + " noch geplant" : "") + ". "
+    + (nPlan.length ? "Nächste Woche: " + nPlan.length + " Einheiten geplant (" + hm(nPlan.reduce((a,u) => a + planMin(u), 0)) + " h)." : "<span class='hl'>Nächste Woche ist noch leer.</span>") + "</p>";
   h += "<div class='mcal' id='board'><div class='mh'>KW</div>" + DAYS.map(d => "<div class='mh'>" + d + "</div>").join("");
-  for (let w = new Date(start); w <= end; w = addDays(w, 7)){
-    const wi = iso(w), e = evalWeek(wi), cur = wi === iso(monday(new Date())), past = wi < iso(monday(new Date()));
-    h += "<button class='mkw' data-gowk='" + wi + "' title='Woche öffnen'><span class='num'>" + isoWeek(w)[1] + "</span>" + (e.hz.length && (past || cur) ? cellHTML(e, e.ok, e.grad, cur, "KW " + isoWeek(w)[1]) : "") + "</button>";
+  weeks.forEach((w, wi) => {
+    const wIso = iso(w), e = evalWeek(wIso), isCur = wIso === iso(curW), isNext = wi === 0;
+    const wd = addDays(w, 6);
+    h += "<button class='mkw" + (isNext ? " next" : "") + (isCur ? " cur" : "") + "' data-gowk='" + wIso + "' title='Woche öffnen'><span class='num'>" + isoWeek(w)[1] + "</span><span class='kwd num'>" + pad(w.getDate()) + "." + pad(w.getMonth()+1) + ".</span>"
+      + (isNext ? "<span class='kwt'>Plan</span>" : e.hz.length ? cellHTML(e, e.ok, e.grad, isCur, "KW " + isoWeek(w)[1]) : "") + "</button>";
     for (let i = 0; i < 7; i++){
       const d = iso(addDays(w, i)), us = all.filter(u => u.datum === d).sort((a,b) => (a.uhrzeit||"").localeCompare(b.uhrzeit||""));
-      const out = d < first || d > last;
-      h += "<div class='mday" + (out ? " out" : "") + (d === today() ? " today" : "") + "' data-day='" + d + "'><div class='mdh'><button class='mdn num' data-add='" + d + "' title='Einheit am " + dayLabel(d) + " anlegen'>" + pd(d).getDate() + "</button></div>"
-        + us.map(u => "<button class='mchip " + esc(u.status) + "' style='--cc:" + typColor(u.typ) + "' data-drag='" + esc(u.id) + "' title='" + esc((u.titel||u.typ) + " · " + u.typ + (istMin(u) ? " · " + fmtMin(istMin(u)) : "")) + "'><span>" + esc(u.titel || u.typ) + "</span></button>").join("") + "</div>";
+      const dd = pd(d);
+      h += "<div class='mday" + (isNext ? " nextw" : "") + (d === today() ? " today" : "") + (d < today() ? " past" : "") + "' data-day='" + d + "'><div class='mdh'><button class='mdn num' data-add='" + d + "' title='Einheit am " + dayLabel(d) + " anlegen'>" + dd.getDate() + (dd.getDate() === 1 || i === 0 ? "<small>." + pad(dd.getMonth()+1) + ".</small>" : "") + "</button><button class='mplus' data-add='" + d + "' aria-label='Einheit am " + dayLabel(d) + " anlegen'>+</button></div>"
+        + us.map(u => "<button class='mchip " + esc(u.status) + "' style='--cc:" + typColor(u.typ) + "' data-drag='" + esc(u.id) + "' title='" + esc((u.titel||u.typ) + " · " + u.typ + (istMin(u) ? " · " + fmtMin(istMin(u)) : planMin(u) ? " · " + fmtMin(planMin(u)) + " geplant" : "")) + "'><span>" + esc(u.titel || u.typ) + "</span></button>").join("") + "</div>";
     }
-  }
-  h += "</div>";
-  const cats = {}; inM.forEach(u => { const k = typInfo(u.typ).kategorie; cats[k] = cats[k] || typColor(u.typ); });
+  });
+  h += "</div><div class='row'><button class='btn' id='calMore'>4 ältere Wochen laden</button>" + (n > 8 ? "<button class='btn ghost' id='calLess'>Weniger anzeigen</button>" : "") + "</div>";
+  const cats = {}; all.forEach(u => { const k = typInfo(u.typ).kategorie; cats[k] = cats[k] || typColor(u.typ); });
   h += "<div class='legend'>" + Object.entries(cats).map(([k,c]) => "<span><i class='sw' style='background:" + c + "'></i>" + esc(k) + "</span>").join("") + "<span><i class='sw' style='border:1px solid var(--muted)'></i>geplant (Umriss)</span></div>"
-    + "<div class='small muted'>Antippen öffnet die Einheit · ziehen verschiebt sie · Tageszahl legt eine neue Einheit an · KW öffnet die Wochenansicht</div>";
+    + "<div class='small muted'>Oben die nächste Woche zum Planen, darunter rückwärts · Antippen öffnet die Einheit · ziehen verschiebt sie · + legt eine neue an · KW öffnet die Wochenansicht</div>";
   v.innerHTML = h;
-  $("mPrev").onclick = () => { S.month = new Date(y, mo - 1, 1); render(); };
-  $("mNext").onclick = () => { S.month = new Date(y, mo + 1, 1); render(); };
-  $("mNow").onclick = () => { const t = new Date(); S.month = new Date(t.getFullYear(), t.getMonth(), 1); render(); };
+  $("calMore").onclick = () => { S.calWeeks = n + 4; render(); };
+  if ($("calLess")) $("calLess").onclick = () => { S.calWeeks = 8; render(); };
   v.querySelectorAll("[data-gowk]").forEach(b => b.onclick = () => { S.week = pd(b.dataset.gowk); setView("woche"); });
 }
 function renderVerlauf(v){
