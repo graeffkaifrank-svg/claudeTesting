@@ -153,6 +153,8 @@ a{color:var(--info)}
 .mkw:hover{color:var(--ink)}
 .mkw .cell{width:14px;height:14px}
 .mwt{grid-column:1 / -1;display:flex;gap:8px;align-items:center;padding:8px 0 2px;min-width:0}
+.mwt.has{background:color-mix(in srgb,var(--hl) 16%,var(--bg));border-left:3px solid var(--hl);padding:5px 8px;margin-top:8px}
+.mwt.has .wtbtn{font-size:14px}
 .wtbtn{border:0;background:transparent;padding:0;text-align:left;font-size:13px;min-width:0;overflow-wrap:anywhere}
 .wtbtn b{font-weight:600}
 .wtbtn.empty{color:var(--muted);font-size:12px;opacity:.6}
@@ -260,7 +262,8 @@ table.ibcs td.r,table.ibcs th.r{text-align:right;white-space:nowrap}
       <button class="tab" data-view="woche">Woche</button>
       <button class="tab" data-view="kalender">Kalender</button>
       <button class="tab" data-view="verlauf">Verlauf</button>
-      <button class="tab" data-view="leistung">Benchmarks</button>
+      <button class="tab" data-view="laufen">Laufen</button>
+      <button class="tab" data-view="klettern">Klettern</button>
       <button class="tab" data-view="ziele">Ziele</button>
       <button class="tab" data-view="vorlagen">Vorlagen</button>
     </nav>
@@ -494,11 +497,11 @@ function render(){
   $("fresh").textContent = S.fresh ? "Stand " + pad(S.fresh.getHours()) + ":" + pad(S.fresh.getMinutes()) : "";
   if (!S.loaded) return;
   const v = $("view");
-  ({ woche: renderWoche, kalender: renderKalender, verlauf: renderVerlauf, leistung: renderLeistung, ziele: renderZiele, vorlagen: renderVorlagen }[S.view] || renderWoche)(v);
+  ({ woche: renderWoche, kalender: renderKalender, verlauf: renderVerlauf, laufen: renderLeistung, leistung: renderLeistung, klettern: renderKlettern, ziele: renderZiele, vorlagen: renderVorlagen }[S.view] || renderWoche)(v);
 }
 function setView(v){ S.view = v; try { history.replaceState(null, "", "#" + v); } catch {} render(); window.scrollTo(0,0); }
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => setView(b.dataset.view));
-window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h && h !== S.view && ["woche","kalender","verlauf","leistung","ziele","vorlagen"].includes(h)) { S.view = h; render(); } });
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h && h !== S.view && ["woche","kalender","verlauf","laufen","klettern","ziele","vorlagen"].includes(h)) { S.view = h; render(); } });
 
 /* ---------- Woche ---------- */
 function statusIcon(st){ return st === "ok" ? "<span style='color:var(--good)'>✓</span>" : st === "plan" ? "<span style='color:var(--mid)'>◐</span>" : "<span style='color:var(--bad)'>○</span>"; }
@@ -856,7 +859,7 @@ function renderKalender(v){
   weeks.forEach((w, wi) => {
     const wIso = iso(w), e = evalWeek(wIso), isCur = wIso === iso(curW), isNext = wi === 0;
     const wt = weekTitle(wIso);
-    h += "<div class='mwt" + (isNext ? " nextw" : "") + "'><button class='wtbtn" + (wt ? "" : " empty") + "' data-wtitle='" + wIso + "'>" + (wt ? "<b>" + esc(wt) + "</b>" : "+ Wochentitel") + "</button>" + (e.exc ? "<span class='pill part'>" + esc(e.exc.art) + "</span>" : "") + "</div>";
+    h += "<div class='mwt" + (isNext ? " nextw" : "") + (wt ? " has" : "") + "'><button class='wtbtn" + (wt ? "" : " empty") + "' data-wtitle='" + wIso + "'>" + (wt ? "<b>" + esc(wt) + "</b>" : "+ Wochentitel") + "</button>" + (e.exc ? "<span class='pill part'>" + esc(e.exc.art) + "</span>" : "") + "</div>";
     const wu = inW(wIso), cat = {}; let tDone = 0, tPlan = 0;
     wu.forEach(u => { const k = typInfo(u.typ).kategorie; cat[k] = cat[k] || { c: typColor(u.typ), d: 0, p: 0 };
       if (u.status === "erledigt"){ const m = istMin(u); cat[k].d += m; tDone += m; } else if (u.status === "geplant"){ const m = planMin(u); cat[k].p += m; tPlan += m; } });
@@ -1055,13 +1058,8 @@ function bindFitness(root){
   hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
   hit.addEventListener("pointerleave", () => { $("fitCur").setAttribute("visibility", "hidden"); $("fitHead").innerHTML = fitHead(R.at(-1)); });
 }
-function renderLeistung(v){
-  const bs = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein");
+function benchHTML(bs){
   let h = "";
-  { const b = bs[0], rs = b ? benchStatus(b).rs : [];
-    if (rs.length && b.hauptwert === "zeit"){ const l = rs.at(-1), f = rs[0], d = num(l.hauptwert) - num(f.hauptwert); let km = 0; try { km = num(JSON.parse(l.werte||"{}").distanz_km); } catch {}
-      h += "<p class='msg' style='margin:0'>" + esc(b.name.replace(/ all-out/i, "")) + " zuletzt <b>" + fmtSec(num(l.hauptwert)) + "</b>" + (km ? " (" + fmtPace(num(l.hauptwert)/km) + ")" : "")
-        + (rs.length > 1 && d ? ", <span style='color:var(--" + (d < 0 ? "good" : "bad") + ")'>" + fmtSec(Math.abs(d)) + " " + (d < 0 ? "schneller" : "langsamer") + "</span> als beim ersten Test am " + shortDate(f.datum) : ".") + "</p>"; } }
   for (const b of bs){
     const s = benchStatus(b); const rs = s.rs;
     const dist = r => { try { return num(JSON.parse(r.werte||"{}").distanz_km); } catch { return 0; } };
@@ -1125,16 +1123,71 @@ function renderLeistung(v){
   h += "<section class='panel'><div class='ctitle'><b>Letzte Läufe</b> · Dauer, Distanz, Pace, Höhenmeter, Puls</div><div class='tblwrap'><table class='ibcs'><thead><tr><th>Datum</th><th>Lauf</th><th class='r'>Dauer</th><th class='r'>Distanz</th><th class='r'>Pace</th><th class='r'>Hm</th><th class='r'>Ø Puls</th><th>Notiz</th></tr></thead><tbody>"
     + runs.map(u => "<tr><td>" + dayLabel(u.datum) + "</td><td><button class='btn ghost' style='padding:0;min-height:0;border:0;text-align:left' data-open='" + esc(u.id) + "'>" + esc(u.titel) + "</button><div class='small muted'>" + esc(u.typ) + "</div></td><td class='r'>" + (istMin(u) ? fmtDur(istMin(u)) : "–") + "</td><td class='r'>" + (num(u.distanz_km) ? num(u.distanz_km).toFixed(2).replace(".", ",") + " km" : "–") + "</td><td class='r'><b>" + (paceOf(u) ? fmtPace(paceOf(u)) : "–") + "</b></td><td class='r'>" + (hmOf(u) ? fmtInt(hmOf(u)) + (num(u.hoehenmeter) ? "" : "*") : "–") + "</td><td class='r'>" + (num(u.puls_avg) || "–") + "</td><td class='small'>" + esc((u.kommentar||"").slice(0, 140)) + ((u.kommentar||"").length > 140 ? " …" : "") + "</td></tr>").join("")
     + "</tbody></table></div><div class='small muted'>Pace erscheint, sobald Distanz und Dauer eingetragen sind. Hm mit * = aus Laufband-Steigung berechnet.</div></section>";
+  return h;
+}
+function bindBench(v, bs){
+  v.querySelectorAll("[data-bnew]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bnew);
+    openSheet("<h2>Ergebnis eintragen</h2><div class='field'><label for='bDate'>Datum</label><input type='date' id='bDate' value='" + today() + "'></div>" + benchFieldsHTML(b) + "<div class='field'><label for='bKom'>Kommentar</label><textarea id='bKom'></textarea></div><div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='bOk'>Speichern</button></div>", () => {
+      $("cx").onclick = closeSheet; $("bOk").onclick = async () => { const res = readBench(b); if (!res){ toast("Bitte mindestens einen Messwert eintragen."); return; } const d = $("bDate").value || today(), k = $("bKom").value.trim(); closeSheet(); await saveBenchResult(b, res, { datum: d, kommentar: k }); }; }); });
+  v.querySelectorAll("[data-bplan]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bplan); openAdd(today(), b.vorlage_id); });
+}
+const isClimbBench = b => /klett/i.test(b.bereich || "");
+/* ---------- Klettern ---------- */
+const isClimb = u => /^Klettern/.test(typInfo(u.typ).kategorie) || /eisger|finger|boulder|klett|fels|mehrseil/i.test(u.typ);
+function renderKlettern(v){
+  const curW = monday(new Date()), ws = Array.from({length: 12}, (_, i) => iso(addDays(curW, -7 * (11 - i))));
+  const kh = w => evalWeek(w).hz.find(x => /klett/i.test(x.h.name));
+  const done = ws.filter(w => w < iso(curW));
+  const hzNow = kh(iso(curW)), subsNow = hzNow ? hzNow.subs : [];
+  const full = done.filter(w => kh(w)?.ok).length, withHz = done.filter(w => kh(w) && !evalWeek(w).exc).length;
+  let h = "<p class='msg' style='margin:0'>" + (hzNow ? "<b>Diese Woche " + subsNow.filter(s => s.st === "ok").length + " von " + subsNow.length + " Kletter-Zielen</b> erreicht" + (subsNow.some(s => s.st !== "ok") ? ", offen: <span class='hl'>" + subsNow.filter(s => s.st !== "ok").map(s => esc(s.z.bezeichnung)).join(", ") + "</span>." : ".") + " " : "")
+    + "Klettern erfüllt in " + full + " von " + withHz + " Wochen, Streak " + streak(hzNow?.h.name || "Klettern") + ".</p>";
+  // Subziel-Raster
+  const subNames = []; done.concat(iso(curW)).forEach(w => (kh(w)?.subs || []).forEach(s => { if (!subNames.includes(s.z.bezeichnung)) subNames.push(s.z.bezeichnung); }));
+  if (subNames.length){
+    h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Kletter-Ziele · <b>Ist / Soll pro Woche</b> · letzte 12 Wochen</div><div class='hmwrap'><table class='hm'><thead><tr><th class='rl'>Subziel</th>" + ws.map(w => "<th>" + isoWeek(pd(w))[1] + "</th>").join("") + "<th>Quote</th></tr></thead><tbody>"
+      + subNames.map(n => { let ok = 0, cnt = 0;
+          const cells = ws.map(w => { const s = kh(w)?.subs.find(x => x.z.bezeichnung === n), cur = w === iso(curW); if (!s) return "<td></td>";
+            if (!cur){ cnt++; if (s.st === "ok") ok++; }
+            const cls = s.ist >= s.ziel ? "full" : s.ist / s.ziel >= 0.5 ? "mid" : (cur && s.ist === 0 ? "" : "low");
+            return "<td><span class='cell num " + cls + (cur ? " cur" : "") + "' style='width:34px;display:grid;place-items:center' title='" + esc(n + " KW " + isoWeek(pd(w))[1]) + "'>" + (s.z.messgroesse === "minuten" ? Math.round(s.ist) : s.ist) + "/" + (s.z.messgroesse === "minuten" ? Math.round(s.ziel) : s.ziel) + "</span></td>"; }).join("");
+          return "<tr><th class='rl'>" + esc(n) + "</th>" + cells + "<td class='num small'><b>" + (cnt ? Math.round(ok / cnt * 100) + " %" : "–") + "</b></td></tr>"; }).join("")
+      + "</tbody></table></div><div class='small muted'>Zahl = erledigt / Ziel · grün erreicht, gelb ≥ 50 %, rot darunter · Quote = Anteil erreichter Wochen (ohne laufende)</div></section>";
+  }
+  // Kletterzeit pro Woche
+  const tD = ws.map((w, i) => { const us = (S.D.Einheiten||[]).filter(u => u.status === "erledigt" && isClimb(u) && u.datum >= w && u.datum <= addDaysIso(w, 6));
+    const kraft = us.filter(u => /kraft/i.test(typInfo(u.typ).kategorie) || /max|eisger/i.test(u.typ)).reduce((a,u) => a + istMin(u), 0), tot = us.reduce((a,u) => a + istMin(u), 0);
+    return { label: "KW" + isoWeek(pd(w))[1] + (w === iso(curW) ? "*" : ""), ac: tot, ac2: kraft, n: us.length, tip: "Kraft " + hm(kraft) + " · Ausdauer/Technik " + hm(tot - kraft) }; });
+  tD.forEach((d, i) => { if (i && !d.label.endsWith("*")) d.delta = d.ac - tD[i-1].ac; });
+  h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Kletterzeit · <b>h:mm pro Woche</b> · letzte 12 Wochen</div><div class='tblwrap'>"
+    + ibcsColumns(tD, { fmt: hm, sub: d => d.n + "×", deltaFmt: x => (x > 0 ? "+" : "−") + hm(Math.abs(x)), aria: "Kletterzeit pro Woche" }) + "</div>"
+    + "<div class='legend'><span><i class='sw' style='background:var(--ac)'></i>Kraft (Finger, Max-Boulder, Eisgeräte)</span><span><i class='sw' style='background:var(--py)'></i>Ausdauer / Technik (Halle, Fels, MSL)</span></div><div class='small muted'>darunter Anzahl Einheiten · farbig = Veränderung zur Vorwoche · * laufende Woche</div></section>";
+  // letzte Einheiten
+  const last = (S.D.Einheiten||[]).filter(u => u.status === "erledigt" && isClimb(u)).sort((a,b) => b.datum.localeCompare(a.datum)).slice(0, 20);
+  h += "<section class='panel'><div class='ctitle'><b>Letzte Klettereinheiten</b> · Dauer und Notizen</div><div class='tblwrap'><table class='ibcs'><thead><tr><th>Datum</th><th>Einheit</th><th class='r'>Dauer</th><th>Notiz</th></tr></thead><tbody>"
+    + last.map(u => "<tr><td>" + dayLabel(u.datum) + "</td><td><button class='btn ghost' style='padding:0;min-height:0;border:0;text-align:left' data-open='" + esc(u.id) + "'>" + esc(u.titel) + "</button><div class='small muted'>" + esc(u.typ) + "</div></td><td class='r'>" + (istMin(u) ? fmtMin(istMin(u)) : "–") + "</td><td class='small'>" + esc((u.kommentar||"").slice(0, 160)) + ((u.kommentar||"").length > 160 ? " …" : "") + "</td></tr>").join("")
+    + "</tbody></table></div></section>";
+  // Kletter-Benchmarks
+  const bs = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein" && isClimbBench(b));
+  h += bs.length ? benchHTML(bs) : "<section class='panel'><h2>Kletter-Benchmarks</h2><p class='muted' style='margin:6px 0 0'>Noch keine angelegt. Sobald im Tab Benchmarks ein Eintrag mit bereich = klettern steht (z.B. Max-Hang 10 s auf 20 mm), erscheint er hier mit Verlauf. Per Sprache: „leg einen Kletter-Benchmark Max-Hang an“.</p></section>";
+  v.innerHTML = h;
+  bindBench(v, bs);
+}
+function renderLeistung(v){
+  const bs = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein" && !isClimbBench(b));
+  let h = "";
+  { const b = bs[0], rs = b ? benchStatus(b).rs : [];
+    if (rs.length && b.hauptwert === "zeit"){ const l = rs.at(-1), f = rs[0], d = num(l.hauptwert) - num(f.hauptwert); let km = 0; try { km = num(JSON.parse(l.werte||"{}").distanz_km); } catch {}
+      h += "<p class='msg' style='margin:0'>" + esc(b.name.replace(/ all-out/i, "")) + " zuletzt <b>" + fmtSec(num(l.hauptwert)) + "</b>" + (km ? " (" + fmtPace(num(l.hauptwert)/km) + ")" : "")
+        + (rs.length > 1 && d ? ", <span style='color:var(--" + (d < 0 ? "good" : "bad") + ")'>" + fmtSec(Math.abs(d)) + " " + (d < 0 ? "schneller" : "langsamer") + "</span> als beim ersten Test am " + shortDate(f.datum) : ".") + "</p>"; } }
+  h += benchHTML(bs);
   // Blog
   const posts = (S.D.Journal||[]).slice().sort((a,b) => b.datum.localeCompare(a.datum));
   h += "<section class='panel'><div class='spread'><h2>Lauf-Blog</h2><button class='btn primary' id='blogNew'" + (S.sample ? "" : " disabled title='Nur in claude.ai mit freigegebener KI-Funktion'") + ">Neuen Beitrag schreiben</button></div>"
     + (posts.length ? posts.map(p => "<article class='post' style='margin-top:14px'><div class='small muted'>" + dayLabel(p.datum) + "</div><h3>" + esc(p.titel) + "</h3><div class='md' style='background:none;padding:0'>" + md(p.text) + "</div></article>").join("") : "<p class='muted'>Noch keine Beiträge. Claude analysiert die Läufe seit dem letzten Beitrag und gibt einen Tipp.</p>") + "</section>";
   v.innerHTML = h;
   bindFitness(v);
-  v.querySelectorAll("[data-bnew]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bnew);
-    openSheet("<h2>Ergebnis eintragen</h2><div class='field'><label for='bDate'>Datum</label><input type='date' id='bDate' value='" + today() + "'></div>" + benchFieldsHTML(b) + "<div class='field'><label for='bKom'>Kommentar</label><textarea id='bKom'></textarea></div><div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='bOk'>Speichern</button></div>", () => {
-      $("cx").onclick = closeSheet; $("bOk").onclick = async () => { const res = readBench(b); if (!res){ toast("Bitte mindestens einen Messwert eintragen."); return; } const d = $("bDate").value || today(), k = $("bKom").value.trim(); closeSheet(); await saveBenchResult(b, res, { datum: d, kommentar: k }); }; }); });
-  v.querySelectorAll("[data-bplan]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bplan); openAdd(today(), b.vorlage_id); });
+  bindBench(v, bs);
   if ($("blogNew")) $("blogNew").onclick = () => writePost(posts[0]);
 }
 async function writePost(last){
@@ -1277,7 +1330,7 @@ function editVorlage(x){
 }
 
 /* ---------- boot ---------- */
-const h0 = location.hash.slice(1); if (["woche","kalender","verlauf","leistung","ziele","vorlagen"].includes(h0)) S.view = h0;
+const h0 = location.hash.slice(1); if (["woche","kalender","verlauf","laufen","klettern","ziele","vorlagen"].includes(h0)) S.view = h0;
 render();
 (async () => {
   const c = window.claude;
