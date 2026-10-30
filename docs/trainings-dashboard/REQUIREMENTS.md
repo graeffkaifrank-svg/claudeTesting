@@ -1,6 +1,6 @@
 # Trainings-Dashboard – Requirements
 
-Stand: 2026-10-30 · Status: Entwurf v2 (Benchmarks, Startdaten, Garmin-Recherche ergänzt) · Owner: Kai
+Stand: 2026-10-30 · Status: Entwurf v3 (Benchmarks v1 nur Laufen, Phasen bestätigt) · Owner: Kai
 
 Dieses Dokument ist die Bauanleitung für Claude Code. Es beschreibt Ziel, Datenmodell, Regeln, Features und Abnahmekriterien. Offene Punkte stehen am Ende und sind vor dem jeweiligen Meilenstein zu klären.
 
@@ -32,7 +32,7 @@ Nicht-Ziele (v1): Bergführer-/Touren-Datenbanken bleiben in Notion. Kein Mehrbe
 | Kalender | **Google Calendar**, Einbahn: Sheet → Kalender | Google Tasks hat keinen Connector; deshalb Kalender-Events statt Aufgaben. |
 | Export für Michi | **PDF** pro Phase | Im Dashboard per Button erzeugt und gespeichert. |
 | Garmin | **Phase 2**, über intervals.icu (siehe §11) | Garmin hat keine offene Privat-API; Strava-API ist seit 2026 nur noch mit Abo nutzbar, intervals.icu ist kostenlos. |
-| Benchmarks | Eigene Blätter + Ansicht „Leistung“ (§4.8, §6.7) | Regelmäßige Tests (Laufen, Klettern) mit Fälligkeit alle ~8 Wochen. |
+| Benchmarks | Eigene Blätter + Ansicht „Leistung“ (§4.8, §6.7) | Regelmäßige Tests mit Fälligkeit alle ~8 Wochen. **v1 nur Laufen**; Klettern und Labor folgen später, das Datenmodell ist dafür schon ausgelegt. |
 
 ## 3. Begriffe
 
@@ -62,8 +62,6 @@ Ein Spreadsheet „Trainingsplan“ mit folgenden Tabellenblättern. Zeile 1 ist
 | status | `geplant` \| `erledigt` \| `ausgelassen` \| `geloescht` | ja | `geloescht` = Soft-Delete, wird überall ausgeblendet |
 | dauer_geplant_min | Zahl | nein | Aus Vorlage vorbelegt |
 | dauer_ist_min | Zahl | nein | Pflicht beim Abhaken nur wenn `Typen.zeit_relevant = ja`, sonst wird `dauer_geplant_min` übernommen |
-| hoehenmeter | Zahl | nein | Aufstieg in hm (wichtig für das Ziel „3500 hm mit 10 kg“); im alten Sheet als Spalte „HM“ vorhanden |
-| rucksack_kg | Zahl | nein | Gepäck bei Touren/Läufen mit Last |
 | gefuehl | Zahl 1–5 | nein | Subjektives Gefühl (ersetzt den „gefühlten Fitness-Score“ der alten Analyse) – siehe offene Fragen |
 | kommentar | Text | nein | Freitext, wie es gelaufen ist |
 | quelle | `dashboard` \| `sprache` \| `migration` \| `garmin` \| `vorschlag` | ja | Herkunft |
@@ -271,24 +269,18 @@ Fälligkeit:
 
 Ansicht „Leistung“:
 - Pro Benchmark eine Karte: letzter Wert, Veränderung zum vorherigen und zum ersten Wert (grün/rot je nach `richtung`), nächste Fälligkeit, kleiner Verlaufs-Chart mit Phasen als Hintergrundbänder.
-- Bereich **Laufen** zusätzlich: Laufminuten und Höhenmeter pro Woche (Balken), Anteil GA1 vs. Intervall, Verlauf „Tempo bei 150 Puls“ (aus B-L2, später automatisch aus Garmin-Daten).
-- Bereich **Klettern**: Max-Hang-Last (absolut und in % Körpergewicht), Repeaters, Onsight-Grad.
-- Labor-Werte (Laktat, Atemgas) als Referenzlinien in den Lauf-Charts.
+- Bereich **Laufen** zusätzlich: Laufminuten pro Woche (Balken), Anteil GA1 vs. Intervall, Verlauf „Tempo bei 150 Puls“ (aus B-L2, später automatisch aus Garmin-Daten).
+- Laborwerte (Laktatschwellen 22.12.25: 11 km/h @ 178 bpm, 14 km/h @ 196 bpm) als Referenzlinien in den Lauf-Charts, als Konstante in `Config`.
 
-Startliste Benchmarks (aus den Coaching-Notizen, mit Michi abzustimmen):
+Startliste Benchmarks v1 – nur Laufen (aus den Coaching-Notizen, Protokolle mit Michi abzustimmen):
 
 | id | Name | Messwerte | Hauptwert | Quelle |
 |---|---|---|---|---|
-| B-L1 | Benchmark-Strecke 5 km / 300 hm all-out | zeit, puls_avg, puls_max | zeit (niedriger besser) | Session 1 („VO2max runterrechnen“) |
+| B-L1 | Benchmark-Strecke 5 km / 300 hm all-out | zeit, puls_avg, puls_max | zeit (niedriger besser) | Session 1 („VO2max runterrechnen“, damals VO2max 52) |
 | B-L2 | Aerobe Effizienz: 30 min bei 150 bpm (Laufband, 1 % Steigung) | tempo_kmh, drift_bpm | tempo_kmh | Session 3 („30 min Z1 oberes Limit 150–160“) |
 | B-L3 | Intervall-Referenz 4×4 min bei 170 bpm | tempo_kmh_avg, drift_bpm | tempo_kmh_avg | Session 1/3 |
-| B-L4 | Höhenmeter-Test mit 10 kg (z.B. feste Hausstrecke) | zeit, hm, puls_avg | hm pro Stunde | Ziel „3500 hm mit 10 kg“ |
-| B-K1 | Max Hang 20 mm, 5 s, beidhändig | zusatzgewicht_kg, koerpergewicht_kg | zusatzgewicht_kg | Session 3 („Max Hang auf meinem Hangboard als Benchmark“); Referenz 23.03.: ~25 kg auf 22 mm |
-| B-K2 | Repeaters 7/3 auf 20 mm bis Abbruch | wiederholungen | wiederholungen | Session 4 („Ausdauer-Protokoll“) |
-| B-K3 | Minutenboulder 20 min | boulder_geschafft | boulder_geschafft | Session 1 |
-| B-K4 | Campus Laddering 1-4-1 | zeit_s, versuche | zeit_s | Session 3 |
-| B-K5 | Onsight-Niveau Halle | grad | grad (Skala in Zahl umrechnen) | Session 5 |
-| B-X1 | Labor: Laktat-/Atemgas-Test | schwelle1_kmh, schwelle1_bpm, schwelle2_kmh, schwelle2_bpm, vo2max | vo2max | Session 3; Werte 22.12.25 / 01.05.26 übernehmen |
+
+Später (nicht v1): Klettern (Max Hang, Repeaters, Minutenboulder, Campus Laddering, Onsight-Grad) und Labortests als eigene Benchmarks.
 
 ## 7. Google Calendar
 
@@ -310,7 +302,7 @@ Neue Skills (ersetzen die Notion-Versionen). Alle lesen die Spreadsheet-ID aus d
 | `training-woche` | „Wie steh ich diese Woche?“ · „Was fehlt mir noch?“ | Ziel-Checkliste der Woche als Text. |
 | `training-auswertung` | „Analysier die letzten 4 Wochen.“ · „Bin ich überlastet?“ | Auswertung inkl. Kommentare, Trend, Streak. |
 | `coaching-export` | „Mach den Export für Michi.“ | PDF wie §6.5. |
-| `benchmark-erfassen` | „Max Hang heute 27 kg auf 20 mm.“ · „5-km-Benchmark in 24:10, Puls 176.“ · „Welche Benchmarks sind fällig?“ | Legt ein Ergebnis an (und hakt die Benchmark-Einheit ab), nennt Veränderung zum letzten Wert. |
+| `benchmark-erfassen` | „5-km-Benchmark in 24:10, Puls 176.“ · „Laufband-Test: 10,4 km/h bei 150 Puls.“ · „Welche Benchmarks sind fällig?“ | Legt ein Ergebnis an (und hakt die Benchmark-Einheit ab), nennt Veränderung zum letzten Wert. |
 | `phase-starten` | „Neues Quartal nach dem Coaching heute: 4 h Laufen, 2× Finger …“ | Legt Phase und Ziele an, schließt die alte Phase ab, bietet Export an. |
 
 Abnahme:
@@ -328,7 +320,7 @@ Einmalig, ausgeführt von Claude mit Notion- und Sheets-Connector. Drei Quellen:
 | ab 29.06.2026 | Notion „Trainingsplan DB“ (`collection://38e798fe-3ffc-80ca-a8df-000b9df8bcf1`) | siehe unten |
 | – | Notion „Trainings Einheiten“ (`collection://342798fe-3ffc-8034-9eb1-000b90cd14ed`: Max Kraft, Core, Intervalle, Z1 Training) und Coaching-Session-Seiten | Michis Anleitungen → `Vorlagen.anleitung`; Session-Notizen → `Phasen.coaching_notizen` (als Text + Link auf die Notion-Seite) |
 
-Regeln für das alte Sheet: „Ist“ = „check“ → erledigt wie geplant; anderer Text in „Ist“ → erledigt mit diesem Text als Titel; „Ist“ leer und Datum vergangen → ausgelassen; Datum in der Zukunft wird nicht übernommen. „Gesamt Gefühl“ und „Kommentare“ → `kommentar`; „HM“ → `hoehenmeter`.
+Regeln für das alte Sheet: „Ist“ = „check“ → erledigt wie geplant; anderer Text in „Ist“ → erledigt mit diesem Text als Titel; „Ist“ leer und Datum vergangen → ausgelassen; Datum in der Zukunft wird nicht übernommen. „Gesamt Gefühl“ und „Kommentare“ → `kommentar`. Die Spalte „HM“ wird nicht übernommen.
 
 Notion-Trainingsplan-DB:
 - `Name` → `titel`; `date` → `datum`; `Status` Planned/Done/Declined → geplant/erledigt/ausgelassen; `Belastungszeit [Min]` → `dauer_ist_min` (bei erledigt) bzw. `dauer_geplant_min`.
@@ -336,11 +328,11 @@ Notion-Trainingsplan-DB:
 - Notion-Templates (Core Training, Intervalle Pyramiden, Max Kraft Finger, Max Kraft Bouldern mit Ausdauer, GA1 Lauf, Klettern Gasi, Stabi Beine) → `Vorlagen`, Seiteninhalt → `anleitung`.
 - Wochenziele aus der DB-Beschreibung → erste Phase `P-01` (Start = Coaching-Start).
 - `quelle = migration`. Notion und das alte Sheet bleiben danach unverändert als Archiv.
-- Benchmark-Werte aus den Notizen (Max Hang ~25 kg auf 22 mm am 23.03.; Laktat 22.12.25: Schwellen 11 km/h @ 178 bpm und 14 km/h @ 196 bpm; VO2max 52) → `Benchmark_Ergebnisse`.
+- Laktatschwellen (22.12.25) → `Config` als Referenzwerte für die Lauf-Charts.
 
 ### 9.1 Startdaten: Phasen und Ziele
 
-Abgeleitet aus den Coaching-Sessions in Notion („Bergführer Coaching Kai Gräff“ → „Coaching Sessions“). Muss Kai bestätigen.
+Abgeleitet aus den Coaching-Sessions in Notion („Bergführer Coaching Kai Gräff“ → „Coaching Sessions“). Von Kai am 30.10.2026 grundsätzlich bestätigt.
 
 Übergeordnete Ziele 2026/2027 (aus der Coaching-Seite, als Text in jeder Phase sichtbar): 7a draußen (Urner Land), 3500 hm Laufen mit 10 kg.
 
@@ -348,8 +340,8 @@ Abgeleitet aus den Coaching-Sessions in Notion („Bergführer Coaching Kai Grä
 |---|---|---|---|
 | P-01 Start | 20.03.–03.05.2026 (Session 1 + 2, Session 2 war eine Retro ohne neue Ziele) | Fettstoffwechsel-Schwelle hoch, Fingerkraft aufbauen | ★ Fingerkraft Max 2× · ★ Intervall 1× (2-3-4-3-2, ~170 bpm) · ★ GA1 ≥ 90 min 1× |
 | P-02 Leistungsanalyse | 04.05.–28.06.2026 (Session 3) | Prio Ausdauer, dann Klettern | ★ GA1 2× (1× Training, 1× Tour) · ★ Intervall Schwelle 4×4 1× · ★ Fingerkraft Max 2× · Core 2× · Klettern Ausdauer 2× · Beinkraft 1× |
-| P-03 100 % Job | 29.06.–Tag vor Session 5 (Session 4) | Minimum-Plan bei Vollzeit, Morgen-Einheiten | ★ Intervall 1× · ★ GA1/Tour 1× · ★ Fingerkraft Max 2× · Core 2× · ★ Klettern 1× (Fels bevorzugt) |
-| P-04 Winter-Vorbereitung | ab Session 5 (Datum fehlt in Notion, Seite angelegt ca. 02.10.2026) | Beine fürs Skifahren, Eis/Mixed, Ausdauer und Klettern halten | ★ Beinkraft 2× · ★ Intervall 1× · ★ GA1 nüchtern 1× (Ziel 1–2×) · ★ Eisgeräte/Mixed + Finger Max 1× · Klettern Halle 1× · Laufen gesamt ≥ X min (Wert offen) |
+| P-03 100 % Job | 29.06.–01.10.2026 (Session 4) | Minimum-Plan bei Vollzeit, Morgen-Einheiten | ★ Intervall 1× · ★ GA1/Tour 1× · ★ Fingerkraft Max 2× · Core 2× · ★ Klettern 1× (Fels bevorzugt) |
+| P-04 Winter-Vorbereitung | ab 02.10.2026, laufend (Session 5; Datum ungefähr, laut Kai „vor ca. einem Monat“, Notion-Seite am 02.10. angelegt) | Beine fürs Skifahren, Eis/Mixed, Ausdauer und Klettern halten | ★ Beinkraft 2× · ★ Intervall 1× · ★ GA1 nüchtern 1× (Ziel 1–2×) · ★ Eisgeräte/Mixed + Finger Max 1× · Klettern Halle 1× · Laufen gesamt ≥ X min (Wert offen) |
 
 Wichtige Anleitungen aus den Sessions für die Vorlagen (Auszug):
 - **Klettergarten** (Session 4): Aufwärmen 5c–6a · 2 schwere Routen projektieren 6c/7a · 2–3 Routen 6b/+ bis zum Rausfliegen · danach Ausdauer-Protokoll.
@@ -403,10 +395,10 @@ Abgleich-Logik (für A–D gleich): Aktivität am selben Tag mit passendem Typ (
 
 ## 13. Offene Fragen
 
-1. Datum von Session 5 (Winter-Vorbereitung) und Termin der nächsten Session?
-2. Phasen und Ziele in §9.1 bestätigen, inkl. Kernziele. Sollen Session 1 und 2 wirklich eine Phase sein?
+1. Termin der nächsten Coaching-Session? Genaues Datum von Session 5 (aktuell ca. 02.10.2026 angenommen).
+2. Kernziele für P-04 (Winter) final festlegen; Wert für „Laufen gesamt“ in P-04.
 3. Typenliste (§4.2): passt die Einteilung? Fehlen Typen (z.B. Eisgeräte/Mixed, Skitour, Hangboard-Ausdauer)?
-4. Benchmarks (§6.7): Liste mit Michi abstimmen, vor allem Protokolle für B-L2, B-L4 und B-K1 (Leiste, Griff, Zeit), damit Tests vergleichbar sind.
+4. Lauf-Benchmarks (§6.7): Protokolle für B-L1 bis B-L3 mit Michi abstimmen (Strecke, Laufband-Einstellungen), damit Tests vergleichbar sind.
 5. Feld `gefuehl` (1–5) beim Abhaken behalten oder weglassen? (Die alte `training-analyse` nutzt einen gefühlten Fitness-Score.)
 6. Kalender: eigener Kalender „Training“ ok? Standardmäßig ganztägig oder mit Uhrzeit planen? Ausgelassene Einheiten löschen oder als `✗` stehen lassen?
 7. Garmin: Ist ein intervals.icu-Konto als Brücke für dich ok?
