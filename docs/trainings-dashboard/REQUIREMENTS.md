@@ -1,6 +1,6 @@
 # Trainings-Dashboard – Requirements
 
-Stand: 2026-10-30 · Status: Entwurf v3 (Benchmarks v1 nur Laufen, Phasen bestätigt) · Owner: Kai
+Stand: 2026-10-30 · Status: Entwurf v4 (Ziele Winter-Phase festgelegt) · Owner: Kai
 
 Dieses Dokument ist die Bauanleitung für Claude Code. Es beschreibt Ziel, Datenmodell, Regeln, Features und Abnahmekriterien. Offene Punkte stehen am Ende und sind vor dem jeweiligen Meilenstein zu klären.
 
@@ -341,7 +341,21 @@ Abgeleitet aus den Coaching-Sessions in Notion („Bergführer Coaching Kai Grä
 | P-01 Start | 20.03.–03.05.2026 (Session 1 + 2, Session 2 war eine Retro ohne neue Ziele) | Fettstoffwechsel-Schwelle hoch, Fingerkraft aufbauen | ★ Fingerkraft Max 2× · ★ Intervall 1× (2-3-4-3-2, ~170 bpm) · ★ GA1 ≥ 90 min 1× |
 | P-02 Leistungsanalyse | 04.05.–28.06.2026 (Session 3) | Prio Ausdauer, dann Klettern | ★ GA1 2× (1× Training, 1× Tour) · ★ Intervall Schwelle 4×4 1× · ★ Fingerkraft Max 2× · Core 2× · Klettern Ausdauer 2× · Beinkraft 1× |
 | P-03 100 % Job | 29.06.–01.10.2026 (Session 4) | Minimum-Plan bei Vollzeit, Morgen-Einheiten | ★ Intervall 1× · ★ GA1/Tour 1× · ★ Fingerkraft Max 2× · Core 2× · ★ Klettern 1× (Fels bevorzugt) |
-| P-04 Winter-Vorbereitung | ab 02.10.2026, laufend (Session 5; Datum ungefähr, laut Kai „vor ca. einem Monat“, Notion-Seite am 02.10. angelegt) | Beine fürs Skifahren, Eis/Mixed, Ausdauer und Klettern halten | ★ Beinkraft 2× · ★ Intervall 1× · ★ GA1 nüchtern 1× (Ziel 1–2×) · ★ Eisgeräte/Mixed + Finger Max 1× · Klettern Halle 1× · Laufen gesamt ≥ X min (Wert offen) |
+| P-04 Winter-Vorbereitung | 02.10.2026 bis zur nächsten Session (voraussichtlich Feb./März 2027, `ende` bleibt leer) | Beine fürs Skifahren, Eisgeräte, Ausdauer und Klettern halten | ★ Beinkraft 2× · ★ Eisgeräte 1× · ★ Laufen gesamt ≥ 180 min · ★ Intervall 1× · ★ GA1 1× · ★ Core 2× · ★ Klettern 2× |
+
+Ziele P-04 als Zeilen für das Blatt `Ziele` (Stand 30.10.2026, von Kai festgelegt):
+
+| bezeichnung | messgroesse | zielwert | filter_ebene | filter_werte | kernziel |
+|---|---|---|---|---|---|
+| Beinkraft | anzahl | 2 | kategorie | Beine Kraft | ja |
+| Eisgeräte | anzahl | 1 | typ | Eisgeräte | ja |
+| Laufen gesamt | minuten | 180 | kategorie | Laufen-Ausdauer | ja |
+| Intervall | anzahl | 1 | typ | Intervall | ja |
+| GA1-Lauf | anzahl | 1 | typ | GA1 | ja |
+| Core | anzahl | 2 | kategorie | Core und Stabi | ja |
+| Klettern | anzahl | 2 | typ | Halle Ausdauer, Fels, Bouldern Max | ja |
+
+Hinweis: Fingerkraft Max ist in P-04 kein eigenes Ziel mehr (laut Session 5 mit dem Eisgeräte-Training kombiniert).
 
 Wichtige Anleitungen aus den Sessions für die Vorlagen (Auszug):
 - **Klettergarten** (Session 4): Aufwärmen 5c–6a · 2 schwere Routen projektieren 6c/7a · 2–3 Routen 6b/+ bis zum Rausfliegen · danach Ausdauer-Protokoll.
@@ -395,8 +409,8 @@ Abgleich-Logik (für A–D gleich): Aktivität am selben Tag mit passendem Typ (
 
 ## 13. Offene Fragen
 
-1. Termin der nächsten Coaching-Session? Genaues Datum von Session 5 (aktuell ca. 02.10.2026 angenommen).
-2. Kernziele für P-04 (Winter) final festlegen; Wert für „Laufen gesamt“ in P-04.
+1. Genaues Datum von Session 5 (aktuell ca. 02.10.2026 angenommen). Nächste Session voraussichtlich Feb./März 2027, Datum folgt.
+2. P-04: Alle sieben Ziele sind als Kernziele eingetragen (Angabe Kai 30.10.). Prüfen, ob die Streak damit realistisch erreichbar ist, sonst einzelne Ziele (z.B. Core) auf „kein Kernziel“ setzen.
 3. Typenliste (§4.2): passt die Einteilung? Fehlen Typen (z.B. Eisgeräte/Mixed, Skitour, Hangboard-Ausdauer)?
 4. Lauf-Benchmarks (§6.7): Protokolle für B-L1 bis B-L3 mit Michi abstimmen (Strecke, Laufband-Einstellungen), damit Tests vergleichbar sind.
 5. Feld `gefuehl` (1–5) beim Abhaken behalten oder weglassen? (Die alte `training-analyse` nutzt einen gefühlten Fitness-Score.)
