@@ -1,6 +1,6 @@
 # Trainings-Dashboard – Requirements
 
-Stand: 2026-10-30 · Status: Entwurf v4 (Ziele Winter-Phase festgelegt) · Owner: Kai
+Stand: 2026-10-30 · Status: Entwurf v5 (Hauptziele mit Subzielen und Streaks je Hauptziel) · Owner: Kai
 
 Dieses Dokument ist die Bauanleitung für Claude Code. Es beschreibt Ziel, Datenmodell, Regeln, Features und Abnahmekriterien. Offene Punkte stehen am Ende und sind vor dem jeweiligen Meilenstein zu klären.
 
@@ -13,7 +13,8 @@ Ein persönliches Trainings-System, das den bisherigen Notion-Trainingsplan abl�
 - Trainingseinheiten planen, abhaken und kommentieren – im Dashboard **und** per (Sprach-)Befehl an Claude.
 - Pro Coaching-Phase (Zeitraum zwischen zwei Coaching-Sessions mit Michi Wohlleben) eigene Wochenziele, gemischt aus **Anzahl Einheiten** und **Minuten**.
 - Wochenüberblick als Checkliste: Welche Ziele sind erfüllt, was fehlt, was ist geplant.
-- Verlauf/Streak über die Wochen und ein **PDF-Export pro Phase** für Michi.
+- Drei **Hauptziele** (Klettern, Laufen, Beine) mit Subzielen; Streak je Hauptziel und Gesamt-Streak.
+- Phasen-Übersicht: auf einen Blick, in welchen Wochen welches Hauptziel wie gut erfüllt war. Dazu ein **PDF-Export pro Phase** für Michi.
 - Zu jeder Einheit die Anleitung, die mit Michi festgelegt wurde (z.B. „Halle: am Ende Repeaters“).
 - Geplante Einheiten erscheinen im Google Calendar.
 - Claude hat Lesezugriff auf alle Daten inkl. Kommentare, um Auswertungen zu machen.
@@ -41,8 +42,8 @@ Nicht-Ziele (v1): Bergführer-/Touren-Datenbanken bleiben in Notion. Kein Mehrbe
 - **Typ**: konkrete Art der Einheit innerhalb einer Kategorie (GA1, Intervall, Fingerkraft Max, …). Jede Einheit hat **genau einen Typ**; die Kategorie ergibt sich aus dem Typ.
 - **Vorlage**: wiederverwendbare Einheit mit Typ, Standarddauer und Michis Anleitung.
 - **Phase**: Zeitraum von einer Coaching-Session bis zur nächsten. Trägt die Ziele.
-- **Ziel**: Wochenziel innerhalb einer Phase, z.B. „Laufen ≥ 180 min“ oder „Fingerkraft Max ≥ 2×“.
-- **Kernziel**: Ziel, das für die Streak zählt.
+- **Hauptziel**: Oberbereich innerhalb einer Phase, z.B. Klettern, Laufen, Beine. Hat eine eigene Streak.
+- **Subziel**: Wochenziel unter einem Hauptziel, z.B. „Laufen gesamt ≥ 180 min“ oder „Fingerkraft Max ≥ 2×“. (Im Datenmodell Blatt `Ziele`.)
 - **Woche**: Montag bis Sonntag, ISO-Kalenderwoche, Zeitzone Europe/Zurich.
 
 ## 4. Datenmodell (Google Sheet)
@@ -119,29 +120,33 @@ Startliste (Vorschlag, mit Kai abzustimmen):
 
 Es ist immer höchstens eine Phase `aktiv`.
 
-### 4.5 `Ziele`
+### 4.5 `Hauptziele`
+
+| Spalte | Beschreibung |
+|---|---|
+| id | `H-` + 6 Zeichen |
+| phase_id | Verweis auf `Phasen.id` |
+| name | z.B. „Klettern“, „Laufen“, „Beine“ |
+| farbe | Hex-Farbe für Übersicht und Raster |
+| reihenfolge | Zahl |
+
+Pro Phase frei definierbar (die Winter-Phase hat drei). Eine neue Phase übernimmt die Hauptziele der vorherigen als Vorschlag.
+
+### 4.5b `Ziele` (Subziele)
 
 | Spalte | Beschreibung |
 |---|---|
 | id | `Z-` + 6 Zeichen |
 | phase_id | Verweis auf `Phasen.id` |
+| hauptziel_id | Verweis auf `Hauptziele.id` (Pflicht) |
 | bezeichnung | z.B. „Laufen gesamt“ |
 | messgroesse | `anzahl` \| `minuten` |
 | zielwert | Zahl pro Woche |
 | filter_ebene | `kategorie` \| `typ` |
 | filter_werte | Kommagetrennte Liste, z.B. `Laufen-Ausdauer` oder `GA1` |
-| kernziel | `ja`/`nein` |
-| reihenfolge | Zahl, Anzeige-Reihenfolge |
+| reihenfolge | Zahl, Anzeige-Reihenfolge innerhalb des Hauptziels |
 
-Beispiel (Kais Wunsch):
-
-| bezeichnung | messgroesse | zielwert | filter_ebene | filter_werte | kernziel |
-|---|---|---|---|---|---|
-| Laufen gesamt | minuten | 180 | kategorie | Laufen-Ausdauer | ja |
-| GA1-Lauf | anzahl | 1 | typ | GA1 | ja |
-| Intervall-Lauf | anzahl | 1 | typ | Intervall | ja |
-| Fingerkraft Max | anzahl | 2 | typ | Fingerkraft Max | ja |
-| Core | anzahl | 2 | kategorie | Core und Stabi | nein |
+Beispiel: siehe Winter-Phase in §9.1.
 
 ### 4.6 `Wochen`
 
@@ -193,10 +198,13 @@ Key/Value: `zeitzone` (Europe/Zurich), `kalender_id` (Google Calendar „Trainin
 3. **Plan-Wert**: Einheiten mit `status = geplant` in der Woche, gleiche Logik mit `dauer_geplant_min`.
 4. **Zielstatus pro Woche**: `erreicht` (Ist ≥ Ziel) · `eingeplant` (Ist + Plan ≥ Ziel) · `offen` (sonst, mit Rest „fehlt 1×“ / „fehlt 45 min“).
 5. **Phase einer Woche**: die Phase, in der der Montag der Woche liegt.
-6. **Woche erfüllt**: alle Kernziele der Phase `erreicht`.
-7. **Streak**: Anzahl aufeinanderfolgender erfüllter Wochen bis zur letzten abgeschlossenen Woche. Die laufende Woche bricht die Streak nicht, sie wird als „läuft“ angezeigt. Ausnahmewochen (`Wochen`-Tabelle) werden übersprungen: sie zählen weder als erfüllt noch brechen sie die Streak.
-8. **Trefferquote je Ziel**: erreichte Wochen ÷ ausgewertete Wochen (ohne Ausnahmewochen) in der Phase.
-9. **Wochen-Load**: Summe Minuten erledigt (Ist) und Summe Minuten geplant (Plan), gesamt und je Kategorie.
+6. **Hauptziel erfüllt (Woche)**: **alle** Subziele des Hauptziels `erreicht`. Kein Schwellenwert.
+7. **Erfüllungsgrad (Woche)** je Hauptziel: Mittelwert über die Subziele von min(1, Ist ÷ Ziel), in Prozent. Nur zur Anzeige (Farbabstufung „teilweise“), zählt nicht für die Streak.
+8. **Gesamt erfüllt (Woche)**: alle Hauptziele der Phase erfüllt (= alle Subziele erfüllt). Gesamt-Erfüllungsgrad = Mittelwert der Hauptziel-Erfüllungsgrade.
+9. **Streaks**: je Hauptziel und für Gesamt die Anzahl aufeinanderfolgender erfüllter Wochen bis zur letzten abgeschlossenen Woche. Die laufende Woche bricht keine Streak, sie wird als „läuft“ angezeigt. Ausnahmewochen (`Wochen`-Tabelle) werden übersprungen: sie zählen weder als erfüllt noch brechen sie die Streak. Streaks laufen über Phasengrenzen weiter, solange es das Hauptziel (gleicher Name) in beiden Phasen gibt; zusätzlich wird die längste Streak je Phase angezeigt.
+10. **Erfüllungsquote**: erfüllte Wochen ÷ ausgewertete Wochen (ohne Ausnahmewochen), je Hauptziel, je Subziel und Gesamt, pro Phase.
+11. **Kombi-Einheiten** (z.B. Eisgeräte + Finger Max) werden als zwei Einheiten erfasst, damit jedes Subziel sauber zählt. Der Skill `training-erfassen` legt bei einem Satz wie „Eisgeräte mit Finger Max gemacht“ automatisch beide an.
+12. **Wochen-Load**: Summe Minuten erledigt (Ist) und Summe Minuten geplant (Plan), gesamt und je Kategorie.
 
 ## 6. Dashboard (Artifact)
 
@@ -205,7 +213,7 @@ Mobile first (ab 360 px), Desktop bis ~1300 px. Hell/Dunkel-Modus. Deutsch.
 ### 6.1 Ansicht „Woche“ (Startansicht)
 
 - Kopf: KW, Datumsbereich, aktive Phase (Name + Fokus einklappbar), Wochen-Navigation (‹ Heute ›).
-- **Ziel-Checkliste**: pro Ziel eine Zeile mit Häkchen-Symbol (erreicht / eingeplant / offen), Ist/Ziel als Zahl und Fortschrittsbalken (erledigt voll, geplant schraffiert). Kernziele sind markiert. Oben: „3 von 4 Kernzielen erreicht“.
+- **Ziel-Checkliste, gruppiert nach Hauptziel**: je Hauptziel ein Block mit Name, Status (erfüllt / teilweise in % / offen) und aktueller Streak; darunter die Subziele mit Häkchen-Symbol (erreicht / eingeplant / offen), Ist/Ziel als Zahl und Fortschrittsbalken (erledigt voll, geplant schraffiert). Ganz oben: Gesamtstatus der Woche und Gesamt-Streak, z.B. „2 von 3 Hauptzielen erfüllt · Gesamt-Streak 4“.
 - **Load**: Minuten erledigt vs. geplant für die Woche, aufgeteilt nach Kategorie (gestapelter Balken).
 - **Kalender**: 7 Tage (Desktop: Spalten, Handy: Zeilen). Karten mit Titel, Typfarbe, Dauer, Status.
   - **Abhaken mit einem Tipp** auf den Kreis der Karte. Bei zeitrelevantem Typ öffnet sich eine Mini-Abfrage „Minuten?“ (vorbelegt mit geplanter Dauer) plus optional Kommentar.
@@ -222,8 +230,10 @@ Abnahme:
 
 ### 6.2 Ansicht „Verlauf“
 
-- **Streak** (Zahl + Flamme o.ä.) und „x von y Wochen erfüllt“ in der aktiven Phase und seit Coaching-Start.
-- **Raster Ziel × Woche** (Heatmap): Zeilen = Ziele der gewählten Phase, Spalten = Wochen, Zelle grün/gelb/rot/grau (Ausnahme). Antippen zeigt Ist/Ziel.
+- **Phasen-Übersicht** (Kern dieser Ansicht): Kopfzeile mit Phase, Zeitraum und Fokus; darunter je Hauptziel und Gesamt eine Kachel mit aktueller Streak, längster Streak der Phase und Erfüllungsquote („9 von 12 Wochen“).
+- **Raster Hauptziel × Woche** (Heatmap): Zeilen = Hauptziele + Gesamt, Spalten = Wochen der Phase. Zelle voll gefärbt = erfüllt, abgestuft nach Erfüllungsgrad = teilweise, leer = nichts, grau schraffiert = Ausnahmewoche, gepunktet = laufende/zukünftige Woche. Eine Zeile pro Hauptziel lässt sich aufklappen und zeigt die Subziele als eigene Zeilen. Antippen einer Zelle zeigt die Subziele der Woche mit Ist/Ziel; ein Tipp auf die KW springt in die Ansicht „Woche“.
+- Am Handy: Wochen horizontal scrollbar, Zeilenbeschriftung fixiert; neueste Woche rechts und beim Öffnen sichtbar.
+- Unterhalb: Übersicht „seit Coaching-Start“ mit allen Phasen hintereinander (gleiches Raster, Phasen als Abschnitte).
 - **Wochenminuten** als Balkendiagramm über die Phase, gestapelt nach Kategorie, mit Linie für das Minuten-Ziel.
 - Phasen-Auswahl (aktive Phase vorausgewählt, ältere wählbar).
 
@@ -231,7 +241,7 @@ Abnahme:
 
 - Liste der Phasen; aktive oben.
 - **Neue Phase starten** (nach einem Coaching): Startdatum, Name, Fokus, Coaching-Notizen; Ziele der vorherigen Phase werden als Kopie vorgeschlagen und können angepasst werden. Die vorherige Phase wird automatisch mit `ende = Start − 1 Tag` abgeschlossen. Danach wird angeboten, den PDF-Export der abgeschlossenen Phase zu erzeugen.
-- Ziele bearbeiten: Bezeichnung, Messgröße, Zielwert, Filter (Auswahl aus Kategorien/Typen), Kernziel, Reihenfolge.
+- Hauptziele bearbeiten (Name, Farbe, Reihenfolge) und darunter die Subziele: Bezeichnung, Messgröße, Zielwert, Filter (Auswahl aus Kategorien/Typen), Reihenfolge.
 
 ### 6.4 Ansicht „Vorlagen“
 
@@ -243,8 +253,8 @@ Button in „Verlauf“ und nach Phasenwechsel. Zeitraum wählbar: eine Phase od
 
 Inhalt:
 1. Kopf: Name, Zeitraum, Phase(n), Fokus.
-2. Kennzahlen: erfüllte Wochen / ausgewertete Wochen, längste und aktuelle Streak, Trefferquote je Ziel, Stunden je Kategorie.
-3. Raster Ziel × Woche und Wochenminuten-Diagramm.
+2. Kennzahlen je Hauptziel und Gesamt: erfüllte / ausgewertete Wochen, längste und aktuelle Streak; Erfüllungsquote je Subziel; Stunden je Kategorie.
+3. Raster Hauptziel × Woche (Subziele aufgeklappt) und Wochenminuten-Diagramm.
 4. Auffällige Kommentare (ausgelassene Einheiten mit Kommentar, Gefühl ≤ 2).
 5. Kurze Auswertung durch Claude (3–6 Sätze: was lief gut, was nicht, Vorschlag für Gespräch) – über die `sample`-Capability, vor dem Export editierbar.
 
@@ -336,26 +346,29 @@ Abgeleitet aus den Coaching-Sessions in Notion („Bergführer Coaching Kai Grä
 
 Übergeordnete Ziele 2026/2027 (aus der Coaching-Seite, als Text in jeder Phase sichtbar): 7a draußen (Urner Land), 3500 hm Laufen mit 10 kg.
 
-| Phase | Zeitraum | Fokus | Wochenziele (★ = Kernziel-Vorschlag) |
+| Phase | Zeitraum | Fokus | Hauptziele: Subziele |
 |---|---|---|---|
-| P-01 Start | 20.03.–03.05.2026 (Session 1 + 2, Session 2 war eine Retro ohne neue Ziele) | Fettstoffwechsel-Schwelle hoch, Fingerkraft aufbauen | ★ Fingerkraft Max 2× · ★ Intervall 1× (2-3-4-3-2, ~170 bpm) · ★ GA1 ≥ 90 min 1× |
-| P-02 Leistungsanalyse | 04.05.–28.06.2026 (Session 3) | Prio Ausdauer, dann Klettern | ★ GA1 2× (1× Training, 1× Tour) · ★ Intervall Schwelle 4×4 1× · ★ Fingerkraft Max 2× · Core 2× · Klettern Ausdauer 2× · Beinkraft 1× |
-| P-03 100 % Job | 29.06.–01.10.2026 (Session 4) | Minimum-Plan bei Vollzeit, Morgen-Einheiten | ★ Intervall 1× · ★ GA1/Tour 1× · ★ Fingerkraft Max 2× · Core 2× · ★ Klettern 1× (Fels bevorzugt) |
-| P-04 Winter-Vorbereitung | 02.10.2026 bis zur nächsten Session (voraussichtlich Feb./März 2027, `ende` bleibt leer) | Beine fürs Skifahren, Eisgeräte, Ausdauer und Klettern halten | ★ Beinkraft 2× · ★ Eisgeräte 1× · ★ Laufen gesamt ≥ 180 min · ★ Intervall 1× · ★ GA1 1× · ★ Core 2× · ★ Klettern 2× |
+| P-01 Start | 20.03.–03.05.2026 (Session 1 + 2, Session 2 war eine Retro ohne neue Ziele) | Fettstoffwechsel-Schwelle hoch, Fingerkraft aufbauen | **Klettern**: Fingerkraft Max 2× · **Laufen**: Intervall 1× (2-3-4-3-2, ~170 bpm), GA1 ≥ 90 min 1× |
+| P-02 Leistungsanalyse | 04.05.–28.06.2026 (Session 3) | Prio Ausdauer, dann Klettern | **Laufen**: GA1 2× (1× Training, 1× Tour), Intervall Schwelle 4×4 1× · **Klettern**: Fingerkraft Max 2×, Klettern Ausdauer 2×, Core 2× · **Beine**: Beinkraft 1× |
+| P-03 100 % Job | 29.06.–01.10.2026 (Session 4) | Minimum-Plan bei Vollzeit, Morgen-Einheiten | **Laufen**: Intervall 1×, GA1/Tour 1× · **Klettern**: Fingerkraft Max 2×, Klettern 1× (Fels bevorzugt), Core 2× |
+| P-04 Winter-Vorbereitung | 02.10.2026 bis zur nächsten Session (voraussichtlich Feb./März 2027, `ende` bleibt leer) | Beine fürs Skifahren, Eisgeräte, Ausdauer und Klettern halten | **Klettern**: Fingerkraft Max 2×, Halle/Fels 2×, Eisgeräte 1×, Core 2× · **Laufen**: gesamt ≥ 180 min, Intervall 1×, GA1 1× · **Beine**: Beinkraft 2× |
 
-Ziele P-04 als Zeilen für das Blatt `Ziele` (Stand 30.10.2026, von Kai festgelegt):
+Ziele P-04 als Zeilen für `Hauptziele` und `Ziele` (Stand 30.10.2026, von Kai festgelegt):
 
-| bezeichnung | messgroesse | zielwert | filter_ebene | filter_werte | kernziel |
+| Hauptziel | Subziel | messgroesse | zielwert | filter_ebene | filter_werte |
 |---|---|---|---|---|---|
-| Beinkraft | anzahl | 2 | kategorie | Beine Kraft | ja |
-| Eisgeräte | anzahl | 1 | typ | Eisgeräte | ja |
-| Laufen gesamt | minuten | 180 | kategorie | Laufen-Ausdauer | ja |
-| Intervall | anzahl | 1 | typ | Intervall | ja |
-| GA1-Lauf | anzahl | 1 | typ | GA1 | ja |
-| Core | anzahl | 2 | kategorie | Core und Stabi | ja |
-| Klettern | anzahl | 2 | typ | Halle Ausdauer, Fels, Bouldern Max | ja |
+| Klettern | Fingerkraft Max | anzahl | 2 | typ | Fingerkraft Max |
+| Klettern | Halle/Fels | anzahl | 2 | typ | Halle Ausdauer, Fels, Bouldern Max |
+| Klettern | Eisgeräte | anzahl | 1 | typ | Eisgeräte |
+| Klettern | Core | anzahl | 2 | kategorie | Core und Stabi |
+| Laufen | Laufen gesamt | minuten | 180 | kategorie | Laufen-Ausdauer |
+| Laufen | Intervall | anzahl | 1 | typ | Intervall |
+| Laufen | GA1-Lauf | anzahl | 1 | typ | GA1 |
+| Beine | Beinkraft | anzahl | 2 | kategorie | Beine Kraft |
 
-Hinweis: Fingerkraft Max ist in P-04 kein eigenes Ziel mehr (laut Session 5 mit dem Eisgeräte-Training kombiniert).
+Eisgeräte ist ein eigener Typ und zählt **nicht** für „Halle/Fels“. Die Kombination aus Session 5 (Eisgeräte + Finger Max) wird als zwei Einheiten erfasst (Regel 11).
+
+Für P-01 bis P-03 werden die Ziele bei der Migration denselben drei Hauptzielen zugeordnet; fehlt ein Hauptziel in einer Phase (z.B. Beine in P-01), zählt die Gesamt-Wertung nur die vorhandenen.
 
 Wichtige Anleitungen aus den Sessions für die Vorlagen (Auszug):
 - **Klettergarten** (Session 4): Aufwärmen 5c–6a · 2 schwere Routen projektieren 6c/7a · 2–3 Routen 6b/+ bis zum Rausfliegen · danach Ausdauer-Protokoll.
@@ -410,7 +423,7 @@ Abgleich-Logik (für A–D gleich): Aktivität am selben Tag mit passendem Typ (
 ## 13. Offene Fragen
 
 1. Genaues Datum von Session 5 (aktuell ca. 02.10.2026 angenommen). Nächste Session voraussichtlich Feb./März 2027, Datum folgt.
-2. P-04: Alle sieben Ziele sind als Kernziele eingetragen (Angabe Kai 30.10.). Prüfen, ob die Streak damit realistisch erreichbar ist, sonst einzelne Ziele (z.B. Core) auf „kein Kernziel“ setzen.
+2. (geklärt 30.10.: Hauptziel nur erfüllt, wenn alle Subziele erfüllt; Gesamt nur, wenn alle Hauptziele erfüllt; Phasen von Coaching zu Coaching; Eisgeräte eigenes Subziel; Kombi-Einheiten als zwei Einträge.)
 3. Typenliste (§4.2): passt die Einteilung? Fehlen Typen (z.B. Eisgeräte/Mixed, Skitour, Hangboard-Ausdauer)?
 4. Lauf-Benchmarks (§6.7): Protokolle für B-L1 bis B-L3 mit Michi abstimmen (Strecke, Laufband-Einstellungen), damit Tests vergleichbar sind.
 5. Feld `gefuehl` (1–5) beim Abhaken behalten oder weglassen? (Die alte `training-analyse` nutzt einen gefühlten Fitness-Score.)
