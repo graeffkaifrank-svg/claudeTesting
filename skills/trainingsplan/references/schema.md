@@ -44,6 +44,9 @@ Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `
 ## Journal (`A:E`)
 `id, datum, titel, text, quelle` – Lauf-Blog. `id` = `J-` + 8 Zeichen. `text` als Markdown mit `- ` Aufzählungen.
 
+## Laufstatistik (`A:J`)
+`monat, laeufe, km, stunden, hm, ga_pace_150, ga_laeufe, ctl, lange_laeufe, aktualisiert_am` – eine Zeile pro Monat (`YYYY-MM`), aus intervals.icu berechnet (Routine). `ga_pace_150` = Pace der lockeren Läufe draussen (Puls 125–155) umgerechnet auf Puls 150, in Sekunden pro km. `ctl` = Fitness-Wert von intervals.icu am Monatsende (gleitender Schnitt der Trainingslast ~6 Wochen, alle Sportarten).
+
 ## Config (`A:B`)
 `schluessel, wert`: `zeitzone`, `coaching_start`, `kalender_id`, `kalender_sync` (ja/nein), `benchmark_intervall_wochen_standard`, `laktat_schwelle1`, `laktat_schwelle2`, `dashboard_url`, `schema_version`, `laufband_steigung_prozent` (15).
 

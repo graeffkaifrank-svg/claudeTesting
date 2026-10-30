@@ -272,8 +272,8 @@ table.ibcs td.r,table.ibcs th.r{text-align:right;white-space:nowrap}
 const SHEET_ID = "11K-STJj8Up1AUSRQ6nWIpm5yBMa3ftp42RNFDilQJZ0";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const GS = "Google Sheets", GC = "Google Calendar";
-const TABS = { Einheiten:"A:S", Journal:"A:E", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B" };
-const KEYCOL = { Wochen:"woche", Config:"schluessel", Typen:"typ" };
+const TABS = { Einheiten:"A:S", Journal:"A:E", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B", Laufstatistik:"A:J" };
+const KEYCOL = { Wochen:"woche", Config:"schluessel", Typen:"typ", Laufstatistik:"monat" };
 const DAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 
 /* ---------- utils ---------- */
@@ -1020,6 +1020,30 @@ function renderLeistung(v){
             + "<td class='r " + (d == null || d === 0 ? "" : (lower ? d < 0 : d > 0) ? "pos" : "neg") + "'>" + (d == null ? "–" : (d > 0 ? "+" : "−") + (isTime ? fmtSec(Math.abs(d)) : Math.abs(d))) + "</td><td>" + esc([r.bedingungen, r.kommentar].filter(Boolean).join(" · ")) + "</td></tr>"; }).join("")
       + "</tbody></table></div>" : "<p class='muted'>Noch kein Ergebnis.</p>";
     h += "</section>";
+  }
+  // Jahresauswertung Laufen (Tab Laufstatistik, aus Garmin/intervals.icu)
+  const ls = (S.D.Laufstatistik||[]).filter(r => /^\d{4}-\d{2}$/.test(r.monat)).sort((a,b) => a.monat.localeCompare(b.monat)).slice(-12);
+  if (ls.length){
+    const mLab = m => { const d = new Date(+m.slice(0,4), +m.slice(5,7) - 1, 1); return d.toLocaleDateString("de-CH", { month: "short" }).replace(/\.$/, "") + " " + m.slice(2,4); };
+    const curM = today().slice(0,7);
+    const kmD = ls.map((r, i) => ({ label: mLab(r.monat) + (r.monat === curM ? "*" : ""), ac: num(r.km), n: r.laeufe, delta: i && r.monat !== curM ? num(r.km) - num(ls[i-1].km) : null }));
+    const pv = ls.map(r => num(r.ga_pace_150) || null);
+    const paD = ls.map((r, i) => { let prev = null; for (let j = i - 1; j >= 0; j--) if (pv[j]){ prev = pv[j]; break; } return { label: mLab(r.monat), ac: pv[i], n: r.ga_laeufe, delta: pv[i] && prev ? pv[i] - prev : null }; });
+    const ctD = ls.map((r, i) => ({ label: mLab(r.monat) + (r.monat === curM ? "*" : ""), ac: num(r.ctl), delta: i ? Math.round((num(r.ctl) - num(ls[i-1].ctl))*10)/10 : null }));
+    const pvs = ls.filter(r => num(r.ga_pace_150)), best = pvs.slice().sort((a,b) => num(a.ga_pace_150) - num(b.ga_pace_150))[0], firstP = pvs[0];
+    const peakKm = ls.slice().sort((a,b) => num(b.km) - num(a.km))[0], last3 = ls.slice(-3).reduce((a,r) => a + num(r.km), 0) / Math.min(3, ls.length);
+    h += "<section class='panel'><h2 style='margin-bottom:6px'>Jahresauswertung Laufen</h2>"
+      + "<p class='msg' style='margin:0 0 14px'>" + (best && firstP ? "Grundlage: GA-Pace bei Puls 150 von <b>" + fmtPace(num(firstP.ga_pace_150)) + "</b> (" + mLab(firstP.monat) + ") auf <b>" + fmtPace(num(best.ga_pace_150)) + "</b> (" + mLab(best.monat) + ")." : "")
+      + (peakKm ? " Umfang zuletzt Ø " + fmtKm(last3) + " km/Monat, Spitze " + fmtKm(num(peakKm.km)) + " km im " + mLab(peakKm.monat) + "." : "") + "</p>"
+      + "<div class='ctitle'><b>Kai Gräff</b> · Laufumfang · <b>km pro Monat</b> · " + mLab(ls[0].monat) + "–" + mLab(ls.at(-1).monat) + "</div><div class='tblwrap'>"
+      + ibcsColumns(kmD, { fmt: x => fmtInt(x), sub: d => d.n + " Läufe", deltaFmt: x => (x > 0 ? "+" : x < 0 ? "−" : "±") + fmtInt(Math.abs(x)), aria: "Laufkilometer pro Monat" }) + "</div>"
+      + "<div class='small muted' style='margin-bottom:18px'>Säule = km · darunter Anzahl Läufe · farbig = Veränderung zum Vormonat · * laufender Monat</div>"
+      + "<div class='ctitle'><b>Kai Gräff</b> · Grundlagen-Effizienz · <b>Pace min/km bei Puls 150</b> · lockere Läufe draussen</div><div class='tblwrap'>"
+      + ibcsColumns(paD, { fmt: x => fmtSec(x), lowerBetter: true, sub: d => d.ac ? "n=" + d.n : "–", deltaFmt: x => (x > 0 ? "+" : "−") + fmtSec(Math.abs(x)), aria: "GA-Pace bei Puls 150" }) + "</div>"
+      + "<div class='small muted' style='margin-bottom:18px'>Pace der lockeren Läufe draussen (Puls 125–155), umgerechnet auf Puls 150 · n = Anzahl Läufe · kürzere Säule = schneller = bessere Grundlage · grün = schneller als im Vormonat mit Daten · Laufband zählt nicht (Distanz der Uhr ungenau)</div>"
+      + "<div class='ctitle'><b>Kai Gräff</b> · Fitness (intervals.icu) · <b>Trainingslast-Schnitt 6 Wochen</b> · Monatsende</div><div class='tblwrap'>"
+      + ibcsColumns(ctD, { fmt: x => fmtInt(x), deltaFmt: x => (x > 0 ? "+" : x < 0 ? "−" : "±") + Math.abs(x).toFixed(1).replace(".", ","), aria: "Fitness-Wert pro Monat" }) + "</div>"
+      + "<div class='small muted'>Gleitender Schnitt der täglichen Trainingslast der letzten ~6 Wochen, alle Sportarten mit Puls (Laufen, Touren, Velo …) · zeigt, wie viel du zuletzt trainiert hast, nicht wie schnell du bist</div></section>";
   }
   // Laufzeit Soll/Ist
   const cur = monday(new Date()); const ws = Array.from({length:12}, (_, i) => iso(addDays(cur, -7*(11-i))));
