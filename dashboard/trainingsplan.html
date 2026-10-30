@@ -355,6 +355,14 @@ function goalsOf(pid){
   return hz.map(h => ({ ...h, subs: (S.D.Ziele||[]).filter(z => z.hauptziel_id === h.id).sort((a,b) => num(a.reihenfolge)-num(b.reihenfolge)) }));
 }
 const unitsIn = (from, to) => (S.D.Einheiten||[]).filter(u => u.status !== "geloescht" && u.datum >= from && u.datum <= to);
+/* Wochen-Soll in Minuten: je Hauptziel das Maximum aus Minuten-Zielen und (Anzahl × kürzeste passende Vorlagen-Dauer) */
+function zielMin(z){
+  if (z.messgroesse === "minuten") return num(z.zielwert);
+  const vals = list(z.filter_werte); const vs = (S.D.Vorlagen||[]).filter(v => v.aktiv !== "nein" && num(v.dauer_standard_min) > 0 && (z.filter_ebene === "kategorie" ? vals.includes(typInfo(v.typ).kategorie) : vals.includes(v.typ)));
+  return vs.length ? num(z.zielwert) * Math.min(...vs.map(v => num(v.dauer_standard_min))) : 0;
+}
+function phaseTargetMin(ph){ return ph ? goalsOf(ph.id).reduce((a,h) => { const m = h.subs.filter(z => z.messgroesse === "minuten").reduce((x,z) => x + zielMin(z), 0), c = h.subs.filter(z => z.messgroesse !== "minuten").reduce((x,z) => x + zielMin(z), 0); return a + Math.max(m, c); }, 0) : 0; }
+const fmtMonYr = d => { const t = pd(d); return t.toLocaleDateString("de-CH", { month: "short" }).replace(/\.$/, "") + " " + t.getFullYear(); };
 const matches = (z, u) => { const vals = list(z.filter_werte); return z.filter_ebene === "kategorie" ? vals.includes(typInfo(u.typ).kategorie) : vals.includes(u.typ); };
 const istMin = u => num(u.dauer_ist_min) || num(u.dauer_geplant_min) || 0;
 const planMin = u => num(u.dauer_geplant_min) || num(vorlage(u.vorlage_id)?.dauer_standard_min) || 0;
@@ -718,7 +726,7 @@ function heatmap(ph){
 function ibcsColumns(data, o){
   o = Object.assign({ fmt: v => Math.round(v), sub: null, lowerBetter: false, deltaFmt: null, h: 210 }, o || {});
   const W = Math.max(320, data.length * 52), H = o.h, top = 34, bot = 26 + (o.sub ? 14 : 0) + (data.some(d => d.delta != null) ? 16 : 0);
-  const max = Math.max(1, ...data.map(d => Math.max(d.ac || 0, d.pl || 0)));
+  const max = Math.max(1, ...data.map(d => Math.max(d.ac || 0, d.pl || 0, d.tl || 0)));
   const bw = W / data.length, y = v => top + (H - top - bot) * (1 - v / max), base = H - bot;
   let s = "<svg class='chart' viewBox='0 0 " + W + " " + H + "' role='img' aria-label='" + esc(o.aria || "Säulendiagramm") + "' style='max-height:" + (H+20) + "px;min-width:" + Math.round(W*0.8) + "px'>";
   data.forEach((d, i) => {
@@ -728,6 +736,8 @@ function ibcsColumns(data, o){
       + "<rect x='" + (cx - w/2) + "' y='" + y(d.ac2) + "' width='" + w + "' height='" + Math.max(0, base - y(d.ac2)) + "' fill='var(--ac)'><title>" + esc(d.tip || o.fmt(d.ac2)) + "</title></rect>"; }
     else if (d.ac != null) s += "<rect x='" + (cx - w/2) + "' y='" + y(d.ac) + "' width='" + w + "' height='" + Math.max(0, base - y(d.ac)) + "' fill='var(--ac)'><title>" + esc(d.tip || o.fmt(d.ac)) + "</title></rect>";
     if (d.ac != null) s += "<text x='" + cx + "' y='" + (Math.min(y(d.ac), d.pl != null ? y(d.pl) : 1e9) - 5) + "' text-anchor='middle' font-size='11' font-weight='600' fill='var(--ink)'>" + esc(o.fmt(d.ac)) + "</text>";
+    if (d.tl){ s += "<line x1='" + (i*bw + 1) + "' x2='" + ((i+1)*bw - 1) + "' y1='" + y(d.tl) + "' y2='" + y(d.tl) + "' stroke='var(--ink)' stroke-width='1.2' stroke-dasharray='4 3'><title>Soll " + esc(o.fmt(d.tl)) + "</title></line>";
+      const nx = data[i+1]; if (!nx || nx.tl !== d.tl) s += "<text x='" + ((i+1)*bw - 2) + "' y='" + (y(d.tl) - 4) + "' text-anchor='end' font-size='10' fill='var(--muted)'>Soll " + esc(o.fmt(d.tl)) + "</text>"; }
     s += "<line x1='" + (i*bw + 2) + "' x2='" + ((i+1)*bw - 2) + "' y1='" + base + "' y2='" + base + "' stroke='var(--ink)' stroke-width='1'/>";
     s += "<text x='" + cx + "' y='" + (base + 14) + "' text-anchor='middle' font-size='10' fill='var(--muted)'>" + esc(d.label) + "</text>";
     let yy = base + 14;
@@ -741,7 +751,8 @@ const hm = m => { m = Math.round(m); return Math.floor(m/60) + ":" + pad(m%60); 
 function minutesChart(ws){
   const cur = iso(monday(new Date()));
   const data = ws.map(w => { const e = evalWeek(w); const c = {}; let t = 0; e.us.filter(u => u.status === "erledigt").forEach(u => { const k = typInfo(u.typ).kategorie; c[k] = (c[k]||0) + istMin(u); t += istMin(u); });
-    return { label: "KW" + isoWeek(pd(w))[1] + (w === cur ? "*" : ""), ac: t, tip: Object.entries(c).map(([k,m]) => k + " " + hm(m)).join(" · ") }; });
+    const tl = Math.round(phaseTargetMin(e.ph)) || null;
+    return { label: "KW" + isoWeek(pd(w))[1] + (w === cur ? "*" : ""), ac: t, tl, tip: Object.entries(c).map(([k,m]) => k + " " + hm(m)).join(" · ") }; });
   data.forEach((d, i) => { if (i > 0 && !d.label.endsWith("*")) d.delta = d.ac - data[i-1].ac; });
   return ibcsColumns(data, { fmt: hm, deltaFmt: v => (v > 0 ? "+" : "−") + hm(Math.abs(v)), aria: "Trainingszeit pro Woche" });
 }
@@ -756,8 +767,8 @@ function renderVerlauf(v){
   h += "<section class='tiles'>" + hz.map(x => { const s = st.per[x.name]; return "<div class='panel tile' style='--hc:" + esc(x.farbe) + "'><div class='flabel'>" + esc(x.name) + "</div><div class='big num'>" + (ph.status === "aktiv" ? streak(x.name) : s.best) + "</div><div class='small muted'>" + (ph.status === "aktiv" ? "aktuelle Streak · beste " + s.best : "beste Streak") + "</div><div class='small num'>" + s.done + " von " + s.eval + " Wochen erfüllt</div></div>"; }).join("")
     + "<div class='panel tile' style='--hc:var(--ink)'><div class='flabel'>Gesamt</div><div class='big num'>" + (ph.status === "aktiv" ? streak(null) : st.total.best) + "</div><div class='small muted'>" + (ph.status === "aktiv" ? "aktuelle Streak · beste " + st.total.best : "beste Streak") + "</div><div class='small num'>" + st.total.done + " von " + st.total.eval + " Wochen erfüllt</div></div></section>";
   h += "<section><h2 style='margin-bottom:8px'>Wochen</h2>" + heatmap(ph) + "<div class='legend' style='margin-top:6px'><span><i class='sw' style='background:var(--good)'></i>erfüllt</span><span><i class='sw' style='background:var(--mid)'></i>teilweise (≥ 50 %)</span><span><i class='sw' style='background:var(--bad)'></i>unter 50 %</span><span><i class='sw' style='background:repeating-linear-gradient(135deg,var(--line) 0 2px,transparent 2px 4px)'></i>Ausnahme</span><span><i class='sw' style='border:1px dashed var(--muted)'></i>laufend</span></div></section>";
-  h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Trainingszeit gesamt · <b>h:mm pro Woche</b> · " + esc(ph.name) + "</div><div class='tblwrap'>" + minutesChart(st.ws) + "</div><div class='small muted'>Säule = Ist · Zeile unten = Veränderung zur Vorwoche · * laufende Woche · Antippen zeigt die Verteilung nach Kategorie</div></section>";
-  h += "<section><h2 style='margin-bottom:8px'>Seit Coaching-Start</h2>" + ps.map(p => "<div style='margin-bottom:12px'><div class='small muted' style='margin-bottom:4px'>" + esc(p.name) + "</div>" + heatmap(p) + "</div>").join("") + "</section>";
+  h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Trainingszeit gesamt · <b>h:mm pro Woche</b> · " + esc(ph.name) + "</div><div class='tblwrap'>" + minutesChart(st.ws) + "</div><div class='small muted'>Säule = Ist · gestrichelt = Wochen-Soll der Phase (Laufen-Minuten + Einheiten × kürzeste Vorlagen-Dauer) · Zeile unten = Veränderung zur Vorwoche · * laufende Woche</div></section>";
+  h += "<section><h2 style='margin-bottom:8px'>Seit Coaching-Start</h2>" + ps.slice().sort((a,b) => b.start.localeCompare(a.start)).map(p => "<div style='margin-bottom:16px'><div style='margin-bottom:4px'><b>" + esc(p.name) + "</b> <span class='small muted'>" + fmtMonYr(p.start) + " – " + (p.ende ? fmtMonYr(p.ende) : "heute") + "</span></div>" + heatmap(p) + "</div>").join("") + "</section>";
   v.innerHTML = h;
   $("phSel").onchange = ev => { S.phaseSel = ev.target.value; render(); };
   $("pdfBtn").onclick = () => openExport(ph);
