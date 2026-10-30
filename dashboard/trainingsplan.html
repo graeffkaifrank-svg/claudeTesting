@@ -132,9 +132,19 @@ a{color:var(--info)}
 .draft{border-top:2px dashed var(--info)}
 
 /* Monatskalender */
-.mcal{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));border-top:1px solid var(--rule)}
+.mcal{display:grid;grid-template-columns:150px repeat(7,minmax(0,1fr));border-top:1px solid var(--rule)}
 .mh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 6px 4px;border-bottom:1px solid var(--line)}
-.mkw{border:0;border-bottom:1px solid var(--line);background:transparent;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.mkw{border:0;border-bottom:1px solid var(--line);background:transparent;padding:6px 10px 8px 0;display:flex;flex-direction:column;align-items:stretch;gap:4px;font-size:11px;color:var(--muted);text-align:left;min-width:0}
+.mkw .kwh{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.mkw .kwn{font-weight:600;color:var(--ink);font-size:12px}
+.mkw .kwtot{font-family:var(--display);font-size:18px;font-weight:600;color:var(--ink);line-height:1.1}
+.mkw .kwtot small{display:block;font-family:var(--body);font-size:10px;font-weight:400;color:var(--muted)}
+.mkw .kwbar{display:flex;height:6px;background:var(--sunk);overflow:hidden}
+.mkw .kwbar i{display:block;height:100%}
+.mkw .kwcats{display:flex;flex-direction:column;gap:1px;font-size:10px;line-height:1.3}
+.mkw .kwcats>span{display:grid;grid-template-columns:8px 1fr auto;gap:4px;align-items:center}
+.mkw .kwcats i{width:8px;height:8px;display:block}
+.mkw .kwcats .kn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mkw:hover{color:var(--ink)}
 .mkw .cell{width:14px;height:14px}
 .mwt{grid-column:1 / -1;display:flex;gap:8px;align-items:center;padding:8px 0 2px;min-width:0}
@@ -146,8 +156,8 @@ a{color:var(--info)}
 .wtbtn.wkt.empty{font-family:var(--body);font-size:12px}
 .mkw .kwd{font-size:10px}
 .mkw .kwt{font-size:10px;font-weight:600;color:var(--hl);text-transform:uppercase;letter-spacing:.05em}
-.mkw.next{color:var(--hl)}
-.mkw.cur{color:var(--ink);font-weight:600}
+.mkw.next .kwn{color:var(--hl)}
+.mkw.cur .kwn::after{content:' · jetzt';color:var(--hl);font-weight:400}
 .mday.nextw{background:color-mix(in srgb,var(--hl) 5%,var(--bg))}
 .mday.past .mdn{color:var(--muted)}
 .mdn small{font-size:10px;font-weight:400;color:var(--muted)}
@@ -168,8 +178,12 @@ a{color:var(--info)}
 .mchip.ausgelassen{opacity:.45;text-decoration:line-through}
 .mchip:hover{border-color:var(--ink);border-left-color:var(--cc)}
 @media (max-width:700px){
-  .mcal{grid-template-columns:24px repeat(7,minmax(0,1fr))}
-  .mkw .kwd{display:none}
+  .mcal{grid-template-columns:44px repeat(7,minmax(0,1fr))}
+  .mkw{padding-right:4px}
+  .mkw .kwd,.mkw .kwcats,.mkw .kwtot small,.mkw .kwh .cell,.mkw .kwt{display:none}
+  .mkw .kwtot{font-size:12px}
+  .mkw .kwn{font-size:10px}
+  .mkw.cur .kwn::after{content:''}
   .mdn small{display:none}
   .mplus{display:none}
   .mday{min-height:64px;padding:2px}
@@ -838,8 +852,17 @@ function renderKalender(v){
     const wIso = iso(w), e = evalWeek(wIso), isCur = wIso === iso(curW), isNext = wi === 0;
     const wt = weekTitle(wIso);
     h += "<div class='mwt" + (isNext ? " nextw" : "") + "'><button class='wtbtn" + (wt ? "" : " empty") + "' data-wtitle='" + wIso + "'>" + (wt ? "<b>" + esc(wt) + "</b>" : "+ Wochentitel") + "</button>" + (e.exc ? "<span class='pill part'>" + esc(e.exc.art) + "</span>" : "") + "</div>";
-    h += "<button class='mkw" + (isNext ? " next" : "") + (isCur ? " cur" : "") + "' data-gowk='" + wIso + "' title='Woche öffnen'><span class='num'>" + isoWeek(w)[1] + "</span><span class='kwd num'>" + pad(w.getDate()) + "." + pad(w.getMonth()+1) + ".</span>"
-      + (isNext ? "<span class='kwt'>Plan</span>" : e.hz.length ? cellHTML(e, e.ok, e.grad, isCur, "KW " + isoWeek(w)[1]) : "") + "</button>";
+    const wu = inW(wIso), cat = {}; let tDone = 0, tPlan = 0;
+    wu.forEach(u => { const k = typInfo(u.typ).kategorie; cat[k] = cat[k] || { c: typColor(u.typ), d: 0, p: 0 };
+      if (u.status === "erledigt"){ const m = istMin(u); cat[k].d += m; tDone += m; } else if (u.status === "geplant"){ const m = planMin(u); cat[k].p += m; tPlan += m; } });
+    const tAll = Math.max(1, tDone + tPlan), cl = Object.entries(cat).filter(([,c]) => c.d + c.p > 0).sort((a,b) => (b[1].d + b[1].p) - (a[1].d + a[1].p));
+    h += "<button class='mkw" + (isNext ? " next" : "") + (isCur ? " cur" : "") + "' data-gowk='" + wIso + "' title='Woche öffnen'>"
+      + "<span class='kwh'><span class='num kwn'>KW " + isoWeek(w)[1] + "</span>" + (isNext ? "<span class='kwt'>Plan</span>" : e.hz.length ? cellHTML(e, e.ok, e.grad, isCur, "KW " + isoWeek(w)[1]) : "") + "</span>"
+      + "<span class='kwd num'>" + pad(w.getDate()) + "." + pad(w.getMonth()+1) + ".</span>"
+      + "<span class='kwtot num'>" + (tDone ? hm(tDone) + " h" : isNext || isCur ? "" : "0:00 h") + (tPlan ? "<small> +" + hm(tPlan) + " geplant</small>" : "") + "</span>"
+      + (cl.length ? "<span class='kwbar'>" + cl.map(([k,c]) => (c.d ? "<i style='width:" + (c.d/tAll*100) + "%;background:" + c.c + "'></i>" : "") + (c.p ? "<i style='width:" + (c.p/tAll*100) + "%;background:repeating-linear-gradient(135deg," + c.c + " 0 2px,transparent 2px 4px)'></i>" : "")).join("") + "</span>"
+        + "<span class='kwcats'>" + cl.map(([k,c]) => "<span><i style='background:" + c.c + "'></i><span class='kn'>" + esc(k) + "</span><span class='num'>" + hm(c.d + c.p) + "</span></span>").join("") + "</span>" : "")
+      + "</button>";
     for (let i = 0; i < 7; i++){
       const d = iso(addDays(w, i)), us = all.filter(u => u.datum === d).sort((a,b) => (a.uhrzeit||"").localeCompare(b.uhrzeit||""));
       const dd = pd(d);
