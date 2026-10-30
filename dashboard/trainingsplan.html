@@ -137,6 +137,13 @@ a{color:var(--info)}
 .mkw{border:0;border-bottom:1px solid var(--line);background:transparent;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
 .mkw:hover{color:var(--ink)}
 .mkw .cell{width:14px;height:14px}
+.mwt{grid-column:1 / -1;display:flex;gap:8px;align-items:center;padding:8px 0 2px;min-width:0}
+.wtbtn{border:0;background:transparent;padding:0;text-align:left;font-size:13px;min-width:0;overflow-wrap:anywhere}
+.wtbtn b{font-weight:600}
+.wtbtn.empty{color:var(--muted);font-size:12px;opacity:.6}
+.wtbtn:hover{color:var(--hl);opacity:1}
+.wtbtn.wkt{font-family:var(--display);font-size:18px;font-weight:500}
+.wtbtn.wkt.empty{font-family:var(--body);font-size:12px}
 .mkw .kwd{font-size:10px}
 .mkw .kwt{font-size:10px;font-weight:600;color:var(--hl);text-transform:uppercase;letter-spacing:.05em}
 .mkw.next{color:var(--hl)}
@@ -406,7 +413,8 @@ const fmtMonYr = d => { const t = pd(d); return t.toLocaleDateString("de-CH", { 
 const matches = (z, u) => { const vals = list(z.filter_werte); return z.filter_ebene === "kategorie" ? vals.includes(typInfo(u.typ).kategorie) : vals.includes(u.typ); };
 const istMin = u => num(u.dauer_ist_min) || num(u.dauer_geplant_min) || 0;
 const planMin = u => num(u.dauer_geplant_min) || num(vorlage(u.vorlage_id)?.dauer_standard_min) || 0;
-const isExc = mon => (S.D.Wochen||[]).find(w => w.woche === weekKey(pd(mon)));
+const isExc = mon => (S.D.Wochen||[]).find(w => w.woche === weekKey(pd(mon)) && String(w.art||"").trim());
+const weekTitle = mon => (S.D.Wochen||[]).find(w => w.woche === weekKey(pd(mon)))?.notiz || "";
 let evalCache = new Map();
 function evalWeek(mon){
   if (evalCache.has(mon)) return evalCache.get(mon);
@@ -488,6 +496,7 @@ function renderWoche(v){
   const wkKm = e.us.filter(u => u.status === "erledigt" && isRun(u)).reduce((a,u) => a + num(u.distanz_km), 0), wkHm = e.us.filter(u => u.status === "erledigt").reduce((a,u) => a + hmOf(u), 0);
   let h = "<section class='wkhead'><div class='row'><button class='btn' id='wPrev' aria-label='Vorherige Woche'>‹</button><button class='btn' id='wNow'>Heute</button><button class='btn' id='wNext' aria-label='Nächste Woche'>›</button></div>"
     + "<h2 class='num'>KW " + kw + " · " + shortDate(mon) + "–" + shortDate(sun) + "</h2>"
+    + "<button class='wtbtn wkt" + (weekTitle(mon) ? "" : " empty") + "' data-wtitle='" + mon + "'>" + (weekTitle(mon) ? esc(weekTitle(mon)) + " <span class='muted'>✎</span>" : "+ Wochentitel") + "</button>"
     + (e.ph ? "<span class='pill neutral'>" + esc(e.ph.name) + "</span>" : "<span class='pill neutral'>keine Phase</span>")
     + (e.exc ? "<span class='pill part'>" + esc(e.exc.art) + "</span>" : "") + "</section>";
   { const n = e.hz.length, openS = e.hz.flatMap(x => x.subs.filter(s => s.st !== "ok").map(s => s.z.bezeichnung)), past = mon < iso(monday(new Date()));
@@ -572,12 +581,29 @@ async function toggleDone(u){
 }
 async function setException(mon, art){
   const wk = weekKey(pd(mon)); const ex = (S.D.Wochen||[]).find(w => w.woche === wk);
-  if (!art && ex){ S.D.Wochen = S.D.Wochen.filter(w => w !== ex); await guarded("Speichern fehlgeschlagen", () => clearRow("Wochen", wk)); }
+  if (!art && ex && String(ex.notiz||"").trim()){ ex.art = ""; await guarded("Speichern fehlgeschlagen", () => updateRow("Wochen", ex)); }
+  else if (!art && ex){ S.D.Wochen = S.D.Wochen.filter(w => w !== ex); await guarded("Speichern fehlgeschlagen", () => clearRow("Wochen", wk)); }
   else if (art && ex){ ex.art = art; await guarded("Speichern fehlgeschlagen", () => updateRow("Wochen", ex)); }
   else if (art){ const o = { woche: wk, art, notiz: "" }; S.D.Wochen.push(o); await guarded("Speichern fehlgeschlagen", () => appendRow("Wochen", o)); }
   toast(art ? "Woche als " + art + " markiert – zählt nicht für Streaks" : "Ausnahme entfernt");
 }
 
+async function setWeekTitle(mon, text){
+  const wk = weekKey(pd(mon)); const ex = (S.D.Wochen||[]).find(w => w.woche === wk); text = text.trim();
+  if (ex && !text && !String(ex.art||"").trim()){ S.D.Wochen = S.D.Wochen.filter(w => w !== ex); await guarded("Speichern fehlgeschlagen", () => clearRow("Wochen", wk)); }
+  else if (ex){ ex.notiz = text; await guarded("Speichern fehlgeschlagen", () => updateRow("Wochen", ex)); }
+  else if (text){ const o = { woche: wk, art: "", notiz: text }; S.D.Wochen.push(o); await guarded("Speichern fehlgeschlagen", () => appendRow("Wochen", o)); }
+  render(); toast(text ? "Wochentitel gespeichert" : "Wochentitel entfernt");
+}
+function editWeekTitle(mon){
+  const [, kw] = isoWeek(pd(mon));
+  openSheet("<h2>Titel für KW " + kw + "</h2><div class='small muted'>" + shortDate(mon) + "–" + shortDate(addDaysIso(mon, 6)) + "</div><div class='field'><label for='wtIn'>Titel / Satz zur Woche</label><input id='wtIn' maxlength='120' placeholder='z.B. Malta und krank' value='" + esc(weekTitle(mon)) + "'></div>"
+    + "<div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='wtOk'>Speichern</button></div>", () => {
+      const inp = $("wtIn"); inp.focus(); $("cx").onclick = closeSheet;
+      const go = () => { const t = inp.value; closeSheet(); setWeekTitle(mon, t); };
+      $("wtOk").onclick = go; inp.onkeydown = ev => { if (ev.key === "Enter") go(); }; });
+}
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-wtitle]"); if (b) editWeekTitle(b.dataset.wtitle); });
 /* ---------- calendar ---------- */
 const calOn = () => cfg("kalender_sync") === "ja" && S.mcp;
 function calTimes(u){
@@ -805,12 +831,13 @@ function renderKalender(v){
   const inW = w => all.filter(u => u.datum >= w && u.datum <= addDaysIso(w, 6));
   const cw = inW(iso(curW)), nw = inW(iso(weeks[0]));
   const cDone = cw.filter(u => u.status === "erledigt"), cPlan = cw.filter(u => u.status === "geplant"), nPlan = nw.filter(u => u.status === "geplant");
-  let h = "<p class='msg' style='margin:0'><b>Diese Woche " + cDone.length + (cDone.length === 1 ? " Einheit</b>" : " Einheiten</b>") erledigt (" + hm(cDone.reduce((a,u) => a + istMin(u), 0)) + " h)" + (cPlan.length ? ", " + cPlan.length + " noch geplant" : "") + ". "
+  let h = "<p class='msg' style='margin:0'><b>Diese Woche " + cDone.length + (cDone.length === 1 ? " Einheit</b>" : " Einheiten</b>") + " erledigt (" + hm(cDone.reduce((a,u) => a + istMin(u), 0)) + " h)" + (cPlan.length ? ", " + cPlan.length + " noch geplant" : "") + ". "
     + (nPlan.length ? "Nächste Woche: " + nPlan.length + " Einheiten geplant (" + hm(nPlan.reduce((a,u) => a + planMin(u), 0)) + " h)." : "<span class='hl'>Nächste Woche ist noch leer.</span>") + "</p>";
   h += "<div class='mcal' id='board'><div class='mh'>KW</div>" + DAYS.map(d => "<div class='mh'>" + d + "</div>").join("");
   weeks.forEach((w, wi) => {
     const wIso = iso(w), e = evalWeek(wIso), isCur = wIso === iso(curW), isNext = wi === 0;
-    const wd = addDays(w, 6);
+    const wt = weekTitle(wIso);
+    h += "<div class='mwt" + (isNext ? " nextw" : "") + "'><button class='wtbtn" + (wt ? "" : " empty") + "' data-wtitle='" + wIso + "'>" + (wt ? "<b>" + esc(wt) + "</b>" : "+ Wochentitel") + "</button>" + (e.exc ? "<span class='pill part'>" + esc(e.exc.art) + "</span>" : "") + "</div>";
     h += "<button class='mkw" + (isNext ? " next" : "") + (isCur ? " cur" : "") + "' data-gowk='" + wIso + "' title='Woche öffnen'><span class='num'>" + isoWeek(w)[1] + "</span><span class='kwd num'>" + pad(w.getDate()) + "." + pad(w.getMonth()+1) + ".</span>"
       + (isNext ? "<span class='kwt'>Plan</span>" : e.hz.length ? cellHTML(e, e.ok, e.grad, isCur, "KW " + isoWeek(w)[1]) : "") + "</button>";
     for (let i = 0; i < 7; i++){
