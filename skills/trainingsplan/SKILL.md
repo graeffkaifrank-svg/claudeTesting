@@ -76,7 +76,8 @@ Zeige den Vorschlag als Liste (Tag, Vorlage, Dauer, ein Satz Begründung) und **
 ### 4. Wochenstand / Auswertung
 - Wochenstand: pro Hauptziel die Subziele mit Ist/Ziel und Status (erreicht / eingeplant / offen), Gesamt und Streaks.
 - Auswertung über mehrere Wochen: Erfüllungsquote je Hauptziel und Subziel, Minuten je Kategorie pro Woche, Trend, auffällige Kommentare (Schmerz, müde, krank, ausgelassen). „Überlastet?“: Wochenminuten der letzten Woche gegen den Schnitt der 4 Wochen davor; > +30 % oder Kommentare mit Erschöpfung/Schmerz → ansprechen.
-- Ausnahmewochen (Tab `Wochen`) zählen weder als erfüllt noch brechen sie Streaks.
+- Ausnahmewochen (Tab `Wochen`, `art` gesetzt) zählen weder als erfüllt noch brechen sie Streaks.
+- Wochentitel: „nenn die Woche Malta“ → Tab `Wochen`, Spalte `notiz` setzen (Zeile anlegen, falls es keine gibt; `art` leer lassen).
 
 ### 5. Benchmarks
 - Fällig, wenn letztes Ergebnis älter als `intervall_wochen` (Standard 8) – bei Wochenstand und Wochenvorschlag erwähnen.

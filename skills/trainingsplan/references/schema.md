@@ -31,7 +31,7 @@ Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `
 - `filter_ebene`: `typ` | `kategorie`; `filter_werte` kommagetrennt
 
 ## Wochen (`A:C`)
-`woche, art, notiz` – `woche` = ISO-Woche `YYYY-Www`; `art`: krank | urlaub | tourenwoche | deload
+`woche, art, notiz` – `woche` = ISO-Woche `YYYY-Www`; `art`: krank | urlaub | tourenwoche | deload oder leer. `notiz` = Wochentitel (z.B. „Malta und krank“). Ausnahmewoche nur, wenn `art` gesetzt ist; eine Zeile nur mit Titel ist eine normale Woche.
 
 ## Benchmarks (`A:J`)
 `id, name, bereich, protokoll, messwerte, hauptwert, richtung, intervall_wochen, vorlage_id, aktiv`
