@@ -9,7 +9,7 @@ Stand: 2026-10-30
 | Phasen P-01–P-04, Hauptziele, Subziele, Vorlagen mit Michis Anleitungen, 3 Lauf-Benchmarks | fertig | Tabs `Phasen`, `Hauptziele`, `Ziele`, `Vorlagen`, `Benchmarks` |
 | Dashboard (Woche, Verlauf, Leistung, Ziele, Vorlagen, PDF, Wochenvorschlag, Kalender-Sync) | fertig | `dashboard/trainingsplan.html` → https://claude.ai/artifact/WXh8YAo3U8Txnop9YKShW9 |
 | Skill für Sprachbefehle | fertig, muss in claude.ai hochgeladen werden | `skills/trainingsplan.zip` |
-| Garmin via intervals.icu (M7) | offen | Notion-Task „Garmin-Schnittstelle über intervals.icu aufbauen“ |
+| Garmin via intervals.icu (M7) | angebunden; 36 Läufe (21.07.–25.10.) zugeordnet, 4 ergänzt, Referenzlauf 19.10. (18:47) gefunden | Routine „Garmin → Trainingsplan Sync“ täglich 21:47 – braucht noch den Google-Sheets-Connector (in claude.ai unter Routines hinzufügen) |
 
 Update 30.10. (Feedback Kai)
 - Raster und PDF in Ampelfarben: grün = erfüllt, gelb = ≥ 50 %, rot = < 50 %.
@@ -21,5 +21,6 @@ Update 30.10. (Feedback Kai)
 
 Bekannte Lücken
 - Kommentare aus Notion-Seiten sind nur für Läufe übernommen, nicht für Klettern/Kraft (Juli–Oktober).
-- 18.10. „GA 1 Lauf“ hat in Notion 2 Minuten – vermutlich 2 h, bitte prüfen.
+- 18.10. korrigiert: laut Garmin Trailrun 2:59 h, 19,6 km.
+- Garmin liefert erst ab 21.07.2026; ältere Läufe ohne Distanz/Puls.
 - Kalender-Sync schreibt in den Hauptkalender (`Config.kalender_id`). Für einen eigenen Kalender „Training“ den Kalender in Google anlegen und seine ID in `Config` eintragen; `kalender_sync = nein` schaltet den Sync ab.
