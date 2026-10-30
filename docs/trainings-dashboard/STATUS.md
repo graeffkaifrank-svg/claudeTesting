@@ -24,3 +24,10 @@ Bekannte Lücken
 - 18.10. korrigiert: laut Garmin Trailrun 2:59 h, 19,6 km.
 - Garmin liefert erst ab 21.07.2026; ältere Läufe ohne Distanz/Puls.
 - Kalender-Sync schreibt in den Hauptkalender (`Config.kalender_id`). Für einen eigenen Kalender „Training“ den Kalender in Google anlegen und seine ID in `Config` eintragen; `kalender_sync = nein` schaltet den Sync ab.
+
+## Update 2026-10-30 (Abend)
+- Pace überall als `m:ss min/km`.
+- Spalte `hoehenmeter` (S) in Einheiten; 19 Touren/Läufe mit Garmin-hm befüllt, Guttannen Bergsteigen (03.10., 1048 hm) ergänzt.
+- Config `laufband_steigung_prozent = 15`; Laufband ohne hm → distanz × 148,3 hm.
+- Leistung: neue IBCS-Charts „km pro Woche“ und „hm pro Woche“ (Laufen vs. Touren gestapelt), Hm-Spalte in „Letzte Läufe“, km/hm im Wochenkopf.
+- Routine-Prompt erweitert (hoehenmeter, Touren, Laufband) → `ROUTINE_PROMPT.md`.

@@ -191,7 +191,7 @@ table.ibcs td.r,table.ibcs th.r{text-align:right;white-space:nowrap}
 const SHEET_ID = "11K-STJj8Up1AUSRQ6nWIpm5yBMa3ftp42RNFDilQJZ0";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const GS = "Google Sheets", GC = "Google Calendar";
-const TABS = { Einheiten:"A:R", Journal:"A:E", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B" };
+const TABS = { Einheiten:"A:S", Journal:"A:E", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B" };
 const KEYCOL = { Wochen:"woche", Config:"schluessel", Typen:"typ" };
 const DAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 
@@ -208,7 +208,7 @@ const num = v => { if (v === "" || v == null) return 0; const n = Number(String(
 const fmtMin = m => { m = Math.round(m); return m >= 60 ? Math.floor(m/60) + " h" + (m%60 ? " " + pad(m%60) : "") : m + " min"; };
 const fmtSec = s => { s = Math.round(s); return Math.floor(s/60) + ":" + pad(s%60); };
 const fmtDur = min => { const t = Math.round(min*60), h = Math.floor(t/3600); return h ? h + ":" + pad(Math.floor(t%3600/60)) + ":" + pad(t%60) : Math.floor(t/60) + ":" + pad(t%60); };
-const fmtPace = secPerKm => secPerKm > 0 ? fmtSec(secPerKm) + "/km" : "";
+const fmtPace = secPerKm => secPerKm > 0 ? fmtSec(secPerKm) + " min/km" : "";
 const rid = (p, n=8) => p + Array.from({length:n}, () => "abcdefghijkmnpqrstuvwxyz23456789"[Math.floor(Math.random()*32)]).join("");
 const nowIso = () => { const d = new Date(); return iso(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()); };
 function parseDate(v){
@@ -417,6 +417,7 @@ function renderWoche(v){
   for (const u of e.us){ const k = typInfo(u.typ).kategorie; cats[k] = cats[k] || { d:0, p:0, c: typColor(u.typ) };
     if (u.status === "erledigt"){ cats[k].d += istMin(u); doneM += istMin(u); } else if (u.status === "geplant"){ cats[k].p += planMin(u); planM += planMin(u); } }
   const tot = Math.max(1, doneM + planM);
+  const wkKm = e.us.filter(u => u.status === "erledigt" && isRun(u)).reduce((a,u) => a + num(u.distanz_km), 0), wkHm = e.us.filter(u => u.status === "erledigt").reduce((a,u) => a + hmOf(u), 0);
   let h = "<section class='wkhead'><div class='row'><button class='btn' id='wPrev' aria-label='Vorherige Woche'>‹</button><button class='btn' id='wNow'>Heute</button><button class='btn' id='wNext' aria-label='Nächste Woche'>›</button></div>"
     + "<h2 class='num'>KW " + kw + " · " + shortDate(mon) + "–" + shortDate(sun) + "</h2>"
     + (e.ph ? "<span class='pill neutral'>" + esc(e.ph.name) + "</span>" : "<span class='pill neutral'>keine Phase</span>")
@@ -424,7 +425,7 @@ function renderWoche(v){
   if (e.hz.length){
     h += "<section class='panel'><div class='total'><span class='big num'>" + okN + " / " + e.hz.length + "</span><span>Hauptziele erfüllt" + (isCur ? " (läuft)" : "") + "</span>"
       + "<span class='flame'>Gesamt-Streak <b class='num'>" + streak(null) + "</b></span>"
-      + "<span class='muted small'>" + fmtMin(doneM) + " trainiert · " + fmtMin(planM) + " geplant</span></div>"
+      + "<span class='muted small'>" + fmtMin(doneM) + " trainiert · " + fmtMin(planM) + " geplant" + (wkKm || wkHm ? " · " + fmtKm(wkKm) + " km · " + fmtInt(wkHm) + " hm" : "") + "</span></div>"
       + "<div class='loadbar' style='margin-top:10px' role='img' aria-label='Load nach Kategorie'>" + Object.entries(cats).map(([k,c]) => (c.d ? "<span title='" + esc(k) + " erledigt' style='width:" + (c.d/tot*100) + "%;background:" + c.c + "'></span>" : "") + (c.p ? "<span title='" + esc(k) + " geplant' style='width:" + (c.p/tot*100) + "%;background:repeating-linear-gradient(135deg," + c.c + " 0 3px,transparent 3px 6px)'></span>" : "")).join("") + "</div>"
       + "<div class='legend' style='margin-top:6px'>" + Object.entries(cats).map(([k,c]) => "<span><i class='sw' style='background:" + c.c + "'></i>" + esc(k) + " " + fmtMin(c.d) + (c.p ? " (+" + fmtMin(c.p) + ")" : "") + "</span>").join("") + "</div></section>";
     h += "<section class='hzgrid'>" + e.hz.map(x => "<div class='panel hz' style='--hc:" + esc(x.h.farbe) + "'><div class='top'><h3>" + esc(x.h.name) + "</h3><div class='row'>"
@@ -697,7 +698,9 @@ function ibcsColumns(data, o){
   data.forEach((d, i) => {
     const cx = i * bw + bw / 2, w = Math.min(34, bw * 0.62);
     if (d.pl != null) s += "<rect x='" + (cx - w/2 + w*0.22) + "' y='" + y(d.pl) + "' width='" + w + "' height='" + Math.max(0, base - y(d.pl)) + "' fill='none' stroke='var(--pl)' stroke-width='1.2'><title>Soll " + esc(o.fmt(d.pl)) + "</title></rect>";
-    if (d.ac != null) s += "<rect x='" + (cx - w/2) + "' y='" + y(d.ac) + "' width='" + w + "' height='" + Math.max(0, base - y(d.ac)) + "' fill='var(--ac)'><title>" + esc(d.tip || o.fmt(d.ac)) + "</title></rect>";
+    if (d.ac != null && d.ac2 != null){ s += "<rect x='" + (cx - w/2) + "' y='" + y(d.ac) + "' width='" + w + "' height='" + Math.max(0, base - y(d.ac)) + "' fill='var(--muted)' opacity='.55'><title>" + esc(d.tip || o.fmt(d.ac)) + "</title></rect>"
+      + "<rect x='" + (cx - w/2) + "' y='" + y(d.ac2) + "' width='" + w + "' height='" + Math.max(0, base - y(d.ac2)) + "' fill='var(--ac)'><title>" + esc(d.tip || o.fmt(d.ac2)) + "</title></rect>"; }
+    else if (d.ac != null) s += "<rect x='" + (cx - w/2) + "' y='" + y(d.ac) + "' width='" + w + "' height='" + Math.max(0, base - y(d.ac)) + "' fill='var(--ac)'><title>" + esc(d.tip || o.fmt(d.ac)) + "</title></rect>";
     if (d.ac != null) s += "<text x='" + cx + "' y='" + (Math.min(y(d.ac), d.pl != null ? y(d.pl) : 1e9) - 5) + "' text-anchor='middle' font-size='11' font-weight='600' fill='var(--ink)'>" + esc(o.fmt(d.ac)) + "</text>";
     s += "<line x1='" + (i*bw + 2) + "' x2='" + ((i+1)*bw - 2) + "' y1='" + base + "' y2='" + base + "' stroke='var(--ink)' stroke-width='1'/>";
     s += "<text x='" + cx + "' y='" + (base + 14) + "' text-anchor='middle' font-size='10' fill='var(--muted)'>" + esc(d.label) + "</text>";
@@ -824,6 +827,13 @@ function spark(b, rs){
 const fmtHW = (b, v) => b.hauptwert === "zeit" ? fmtSec(num(v)) : (num(v) + " " + (parseMess(b).find(m => m.k === b.hauptwert)?.unit || ""));
 const isRun = u => typInfo(u.typ).kategorie === "Laufen-Ausdauer";
 const paceOf = u => { const d = num(u.distanz_km), m = istMin(u); return d > 0 && m > 0 ? m*60/d : 0; };
+/* Höhenmeter: Spalte hoehenmeter, sonst Laufband-Regel (Steigung aus Config, Standard 15 %) */
+const isTread = u => /laufband|treadmill/i.test((u.titel||"") + " " + (u.kommentar||""));
+const hmOf = u => { const v = num(u.hoehenmeter); if (v > 0) return v; const d = num(u.distanz_km); if (!(d > 0) || !isRun(u) || !isTread(u)) return 0; const g = (num(cfg("laufband_steigung_prozent")) || 15)/100; return Math.round(d*1000*g/Math.sqrt(1+g*g)); };
+const fmtKm = x => (Math.round(x*10)/10).toFixed(1).replace(".", ",");
+const fmtInt = x => Math.round(x).toLocaleString("de-CH");
+function volumeWeeks(n){ const cur = monday(new Date()); return Array.from({length:n}, (_, i) => iso(addDays(cur, -7*(n-1-i)))).map(w => { const us = (S.D.Einheiten||[]).filter(u => u.status === "erledigt" && u.datum >= w && u.datum <= addDaysIso(w, 6));
+  const runs = us.filter(isRun); return { w, label: "KW" + isoWeek(pd(w))[1] + (w === iso(cur) ? "*" : ""), cur: w === iso(cur), km: runs.reduce((a,u) => a + num(u.distanz_km), 0), hmRun: runs.reduce((a,u) => a + hmOf(u), 0), hmAll: us.reduce((a,u) => a + hmOf(u), 0), tread: runs.filter(isTread).length }; }); }
 function renderLeistung(v){
   const bs = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein");
   let h = "";
@@ -854,11 +864,19 @@ function renderLeistung(v){
     return { label: "KW" + isoWeek(pd(w))[1] + (w === iso(cur) ? "*" : ""), ac, pl, delta: pl != null && w !== iso(cur) ? ac - pl : null, tip: "GA1 " + hm(r.filter(u => u.typ === "GA1").reduce((a,u) => a+istMin(u),0)) + " · Intervall " + hm(r.filter(u => u.typ === "Intervall").reduce((a,u) => a+istMin(u),0)) }; });
   h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Laufzeit Ist vs. Soll · <b>h:mm pro Woche</b> · letzte 12 Wochen</div><div class='tblwrap'>"
     + ibcsColumns(data, { fmt: hm, deltaFmt: x => (x >= 0 ? "+" : "−") + hm(Math.abs(x)), aria: "Laufzeit pro Woche" }) + "</div><div class='small muted'>Säule = Ist · Rahmen = Soll" + (lz ? " (" + hm(num(lz.zielwert)) + ")" : "") + " · farbig = Abweichung vom Soll · * laufende Woche</div></section>";
+  // Umfang: km und Höhenmeter pro Woche
+  const vw = volumeWeeks(12);
+  const kmData = vw.map((x, i) => ({ label: x.label, ac: x.km, delta: i && !x.cur ? x.km - vw[i-1].km : null }));
+  const hmData = vw.map((x, i) => ({ label: x.label, ac: x.hmAll, ac2: x.hmRun, delta: i && !x.cur ? x.hmAll - vw[i-1].hmAll : null, tip: "Laufen " + fmtInt(x.hmRun) + " hm" + (x.tread ? " (inkl. " + x.tread + "× Laufband)" : "") + " · Touren/Sonstiges " + fmtInt(x.hmAll - x.hmRun) + " hm" }));
+  h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Laufumfang · <b>km pro Woche</b> · letzte 12 Wochen</div><div class='tblwrap'>"
+    + ibcsColumns(kmData, { fmt: fmtKm, deltaFmt: x => (x > 0 ? "+" : x < 0 ? "−" : "±") + fmtKm(Math.abs(x)), aria: "Laufkilometer pro Woche" }) + "</div><div class='small muted'>Säule = gelaufene km · farbig = Veränderung zur Vorwoche · * laufende Woche</div></section>";
+  h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Höhenmeter · <b>hm pro Woche</b> · letzte 12 Wochen</div><div class='tblwrap'>"
+    + ibcsColumns(hmData, { fmt: fmtInt, deltaFmt: x => (x > 0 ? "+" : x < 0 ? "−" : "±") + fmtInt(Math.abs(x)), aria: "Höhenmeter pro Woche" }) + "</div><div class='legend'><span><i class='sw' style='background:var(--ac)'></i>Laufen</span><span><i class='sw' style='background:var(--muted);opacity:.55'></i>Touren / Sonstiges</span></div><div class='small muted'>Laufband immer mit " + (num(cfg("laufband_steigung_prozent")) || 15) + " % Steigung → ca. " + Math.round(1000*((num(cfg("laufband_steigung_prozent")) || 15)/100)/Math.sqrt(1+((num(cfg("laufband_steigung_prozent")) || 15)/100)**2)) + " hm pro km · Antippen zeigt die Aufteilung</div></section>";
   // letzte Läufe
   const runs = (S.D.Einheiten||[]).filter(u => u.status === "erledigt" && isRun(u)).sort((a,b) => b.datum.localeCompare(a.datum)).slice(0, 20);
-  h += "<section class='panel'><div class='ctitle'><b>Letzte Läufe</b> · Dauer, Distanz, Pace, Puls</div><div class='tblwrap'><table class='ibcs'><thead><tr><th>Datum</th><th>Lauf</th><th class='r'>Dauer</th><th class='r'>Distanz</th><th class='r'>Pace</th><th class='r'>Ø Puls</th><th>Notiz</th></tr></thead><tbody>"
-    + runs.map(u => "<tr><td>" + dayLabel(u.datum) + "</td><td><button class='btn ghost' style='padding:0;min-height:0;border:0;text-align:left' data-open='" + esc(u.id) + "'>" + esc(u.titel) + "</button><div class='small muted'>" + esc(u.typ) + "</div></td><td class='r'>" + (istMin(u) ? fmtDur(istMin(u)) : "–") + "</td><td class='r'>" + (num(u.distanz_km) ? num(u.distanz_km).toFixed(2).replace(".", ",") + " km" : "–") + "</td><td class='r'><b>" + (paceOf(u) ? fmtPace(paceOf(u)) : "–") + "</b></td><td class='r'>" + (num(u.puls_avg) || "–") + "</td><td class='small'>" + esc((u.kommentar||"").slice(0, 140)) + ((u.kommentar||"").length > 140 ? " …" : "") + "</td></tr>").join("")
-    + "</tbody></table></div><div class='small muted'>Pace erscheint, sobald Distanz und Dauer eingetragen sind (beim Abhaken oder später automatisch über Garmin).</div></section>";
+  h += "<section class='panel'><div class='ctitle'><b>Letzte Läufe</b> · Dauer, Distanz, Pace, Höhenmeter, Puls</div><div class='tblwrap'><table class='ibcs'><thead><tr><th>Datum</th><th>Lauf</th><th class='r'>Dauer</th><th class='r'>Distanz</th><th class='r'>Pace</th><th class='r'>Hm</th><th class='r'>Ø Puls</th><th>Notiz</th></tr></thead><tbody>"
+    + runs.map(u => "<tr><td>" + dayLabel(u.datum) + "</td><td><button class='btn ghost' style='padding:0;min-height:0;border:0;text-align:left' data-open='" + esc(u.id) + "'>" + esc(u.titel) + "</button><div class='small muted'>" + esc(u.typ) + "</div></td><td class='r'>" + (istMin(u) ? fmtDur(istMin(u)) : "–") + "</td><td class='r'>" + (num(u.distanz_km) ? num(u.distanz_km).toFixed(2).replace(".", ",") + " km" : "–") + "</td><td class='r'><b>" + (paceOf(u) ? fmtPace(paceOf(u)) : "–") + "</b></td><td class='r'>" + (hmOf(u) ? fmtInt(hmOf(u)) + (num(u.hoehenmeter) ? "" : "*") : "–") + "</td><td class='r'>" + (num(u.puls_avg) || "–") + "</td><td class='small'>" + esc((u.kommentar||"").slice(0, 140)) + ((u.kommentar||"").length > 140 ? " …" : "") + "</td></tr>").join("")
+    + "</tbody></table></div><div class='small muted'>Pace erscheint, sobald Distanz und Dauer eingetragen sind. Hm mit * = aus Laufband-Steigung berechnet.</div></section>";
   // Blog
   const posts = (S.D.Journal||[]).slice().sort((a,b) => b.datum.localeCompare(a.datum));
   h += "<section class='panel'><div class='spread'><h2>Lauf-Blog</h2><button class='btn primary' id='blogNew'" + (S.sample ? "" : " disabled title='Nur in claude.ai mit freigegebener KI-Funktion'") + ">Neuen Beitrag schreiben</button></div>"

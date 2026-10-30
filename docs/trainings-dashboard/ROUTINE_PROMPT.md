@@ -1,0 +1,18 @@
+# Routine „Garmin → Trainingsplan Sync“ – Prompt
+
+Täglich 21:47 (Europe/Zurich), neue Session pro Lauf. Benötigt: Google-Sheets-Connector, Netzwerk-Secret für intervals.icu.
+
+```
+Tägliche Übernahme von Kais Garmin-Aktivitäten (über intervals.icu) in sein Google Sheet „Trainingsplan 2.0“ (Spreadsheet-ID 11K-STJj8Up1AUSRQ6nWIpm5yBMa3ftp42RNFDilQJZ0). Werkzeug: Google-Sheets-Connector (get_values, update_values, append_values). Fehlt er in der Sitzung, sofort abbrechen und das melden.
+
+1. Aktivitäten der letzten 3 Tage holen: GET https://intervals.icu/api/v1/athlete/i776954/activities?oldest=<heute-3>&newest=<heute> (Auth kommt automatisch über das Netzwerk-Secret; nichts selbst setzen).
+2. Tab `Einheiten!A:S` lesen, Zeile 1 = Kopfzeile, Spalten immer über den Kopf adressieren: id, datum, uhrzeit, titel, typ, vorlage_id, status, dauer_geplant_min, dauer_ist_min, gefuehl, kommentar, quelle, kalender_event_id, garmin_activity_id, erstellt_am, geaendert_am, distanz_km, puls_avg, hoehenmeter. Aktivitäten, deren id schon in garmin_activity_id steht (Feld kann mehrere ids kommagetrennt enthalten), überspringen.
+3. Verarbeitet werden Läufe (type Run, VirtualRun, TrailRun) und Touren (type Hike, Walk, Mountaineering, BackcountrySki, AlpineSki mit total_elevation_gain > 300). Rad, Klettern, Workout usw. ignorieren.
+4. Werte je Aktivität: dauer_ist_min = moving_time/60 (2 Dezimalen), distanz_km = distance/1000 (2 Dezimalen), puls_avg = round(average_heartrate), hoehenmeter = round(total_elevation_gain).
+   Laufband-Regel: Kai läuft auf dem Laufband immer mit 15 % Steigung (Config `laufband_steigung_prozent`). Bei VirtualRun oder wenn Name „Laufband“/„Treadmill“ enthält oder total_elevation_gain leer/0 bei einem Indoor-Lauf: hoehenmeter = round(distanz_km × 148.3) und „Laufband 15 %“ in den Kommentar einer neuen Zeile.
+5. Zuordnung: Einheit am selben Datum mit passendem Typ (Läufe: GA1, Intervall, Trail/Berglauf, Lauf-Benchmark; Touren: Bergtour, Skitour / Bergtour, Velo / Wandern / Skifahren), status geplant oder erledigt, ohne garmin_activity_id; bei mehreren die mit der nächstliegenden Dauer. Dort setzen: status=erledigt, dauer_ist_min, distanz_km, puls_avg, hoehenmeter, garmin_activity_id=id, geaendert_am=jetzt (YYYY-MM-DDTHH:MM:SS, Europe/Zurich). Kommentar nicht überschreiben. Zeile direkt vorher über die id in Spalte A suchen und per update_values komplett schreiben (A<n>:S<n>).
+6. Ohne passende Einheit: neue Zeile per append_values auf Einheiten!A1 (19 Werte in Kopf-Reihenfolge): id = E- + 8 Zeichen aus abcdefghijkmnpqrstuvwxyz23456789; typ = Trail/Berglauf bei TrailRun, Intervall wenn der Name „Intervall“ enthält, Bergtour bei Touren, sonst GA1; titel = name; status = erledigt; quelle = garmin; kommentar = "Aus Garmin übernommen."; datum/uhrzeit aus start_date_local; erstellt_am = geaendert_am = jetzt.
+7. Referenzlauf erkennen: Run in Schlieren mit 4,30–4,45 km und Pace unter 4:40 min/km → typ = Lauf-Benchmark, titel = Referenzlauf, zusätzlich Zeile in `Benchmark_Ergebnisse` (id = R-…, benchmark_id = B-L1, datum, hauptwert = elapsed_time in Sekunden, werte = JSON {zeit, distanz_km, puls_avg}, kommentar mit Zeit und Pace, einheit_id, quelle = garmin).
+8. Alle Werte als Text schreiben, Datum YYYY-MM-DD, Dezimalpunkt. Nichts löschen.
+9. Zum Schluss 2–3 Sätze: was übernommen wurde, je Lauf Distanz, Pace im Format „m:ss min/km“ und Höhenmeter; Wochensumme km und hm. Wenn nichts Neues da war, nur das sagen.
+```

@@ -2,10 +2,12 @@
 
 Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `id` (bzw. leerem Schlüssel) ignorieren.
 
-## Einheiten (`A:R`)
-`id, datum, uhrzeit, titel, typ, vorlage_id, status, dauer_geplant_min, dauer_ist_min, gefuehl, kommentar, quelle, kalender_event_id, garmin_activity_id, erstellt_am, geaendert_am, distanz_km, puls_avg`
+## Einheiten (`A:S`)
+`id, datum, uhrzeit, titel, typ, vorlage_id, status, dauer_geplant_min, dauer_ist_min, gefuehl, kommentar, quelle, kalender_event_id, garmin_activity_id, erstellt_am, geaendert_am, distanz_km, puls_avg, hoehenmeter`
 - `dauer_ist_min` darf Dezimalstellen haben (18:08 → 18.13)
-- Läufe: `distanz_km` und `puls_avg` eintragen, wenn bekannt. Pace = dauer_ist_min × 60 / distanz_km Sekunden pro km, Anzeige `m:ss/km`.
+- Läufe: `distanz_km` und `puls_avg` eintragen, wenn bekannt. Pace = dauer_ist_min × 60 / distanz_km Sekunden pro km, Anzeige immer `m:ss min/km`.
+- `hoehenmeter`: Aufstieg in m (Garmin `total_elevation_gain`, bei Touren und Läufen). **Laufband: Kai läuft immer mit 15 % Steigung** (Config `laufband_steigung_prozent`) → ohne eigenen Wert hm = distanz_km × 148,3 (gerundet), im Kommentar „Laufband“ vermerken.
+- `garmin_activity_id` kann mehrere ids kommagetrennt enthalten.
 - `status`: `geplant` | `erledigt` | `ausgelassen` | `geloescht`
 - `quelle`: `dashboard` | `sprache` | `migration` | `vorschlag` | `garmin`
 - `gefuehl`: 1–5 oder leer
@@ -43,7 +45,7 @@ Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `
 `id, datum, titel, text, quelle` – Lauf-Blog. `id` = `J-` + 8 Zeichen. `text` als Markdown mit `- ` Aufzählungen.
 
 ## Config (`A:B`)
-`schluessel, wert`: `zeitzone`, `coaching_start`, `kalender_id`, `kalender_sync` (ja/nein), `benchmark_intervall_wochen_standard`, `laktat_schwelle1`, `laktat_schwelle2`, `dashboard_url`, `schema_version`.
+`schluessel, wert`: `zeitzone`, `coaching_start`, `kalender_id`, `kalender_sync` (ja/nein), `benchmark_intervall_wochen_standard`, `laktat_schwelle1`, `laktat_schwelle2`, `dashboard_url`, `schema_version`, `laufband_steigung_prozent` (15).
 
 ## Regeln für die Auswertung
 1. Woche = Montag–Sonntag. Phase einer Woche = die Phase, in der der Montag liegt (sonst die, die in der Woche beginnt).
