@@ -131,6 +131,32 @@ a{color:var(--info)}
 .dragghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-60%);background:var(--ink);color:var(--bg);font-weight:600;padding:6px 12px;box-shadow:0 6px 16px rgba(0,0,0,.2);white-space:nowrap}
 .draft{border-top:2px dashed var(--info)}
 
+/* Monatskalender */
+.mcal{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));border-top:1px solid var(--rule)}
+.mh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 6px 4px;border-bottom:1px solid var(--line)}
+.mkw{border:0;border-bottom:1px solid var(--line);background:transparent;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.mkw:hover{color:var(--ink)}
+.mkw .cell{width:14px;height:14px}
+.mday{border-left:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 4px 6px;min-height:96px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mday.out{background:var(--sunk)}
+.mday.out .mdn{color:var(--muted)}
+.mday.over{background:color-mix(in srgb,var(--hl) 10%,var(--bg))}
+.mdh{display:flex}
+.mdn{border:0;background:transparent;padding:0 2px;font-weight:600;font-size:12px;min-width:20px;text-align:left}
+.mdn:hover{color:var(--hl)}
+.mday.today .mdn{color:var(--bg);background:var(--hl);border-radius:2px;text-align:center}
+.mchip{display:block;width:100%;text-align:left;border:1px solid transparent;border-left:3px solid var(--cc);background:var(--sunk);padding:1px 4px;font-size:11px;line-height:1.3;touch-action:none;user-select:none;-webkit-user-select:none;min-width:0}
+.mchip span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mchip.geplant{background:transparent;border-color:var(--line);border-left-color:var(--cc)}
+.mchip.ausgelassen{opacity:.45;text-decoration:line-through}
+.mchip:hover{border-color:var(--ink);border-left-color:var(--cc)}
+@media (max-width:700px){
+  .mcal{grid-template-columns:24px repeat(7,minmax(0,1fr))}
+  .mday{min-height:64px;padding:2px}
+  .mchip{height:7px;padding:0;border-left-width:0;background:var(--cc)}
+  .mchip.geplant{background:transparent;border:1px solid var(--cc)}
+  .mchip span{display:none}
+}
 /* Verlauf */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px 32px}
 .tile{border-top:3px solid var(--hc);padding-top:10px}
@@ -193,8 +219,9 @@ table.ibcs td.r,table.ibcs th.r{text-align:right;white-space:nowrap}
     <div class="brand"><span class="eyebrow">Kai Gräff · Bergführer-Ausbildung · <span id="phaseSign">Trainingsplan</span></span><h1>Trainingsplan</h1><span class="small muted" id="fresh"></span></div>
     <nav class="tabs" aria-label="Ansichten">
       <button class="tab" data-view="woche">Woche</button>
+      <button class="tab" data-view="kalender">Kalender</button>
       <button class="tab" data-view="verlauf">Verlauf</button>
-      <button class="tab" data-view="leistung">Leistung</button>
+      <button class="tab" data-view="leistung">Benchmarks</button>
       <button class="tab" data-view="ziele">Ziele</button>
       <button class="tab" data-view="vorlagen">Vorlagen</button>
     </nav>
@@ -275,7 +302,7 @@ function banner(text, allow){
 }
 
 /* ---------- state ---------- */
-const S = { mcp:null, sample:null, dl:null, D:{}, H:{}, loaded:false, view:"woche", week:monday(new Date()), phaseSel:null, busy:new Set(), drafts:[], openHz:new Set(), fresh:null };
+const S = { mcp:null, sample:null, dl:null, D:{}, H:{}, loaded:false, view:"woche", week:monday(new Date()), month:new Date(new Date().getFullYear(), new Date().getMonth(), 1), phaseSel:null, busy:new Set(), drafts:[], openHz:new Set(), fresh:null };
 const today = () => iso(new Date());
 const cfg = k => (S.D.Config||[]).find(r => r.schluessel === k)?.wert || "";
 
@@ -427,11 +454,11 @@ function render(){
   $("fresh").textContent = S.fresh ? "Stand " + pad(S.fresh.getHours()) + ":" + pad(S.fresh.getMinutes()) : "";
   if (!S.loaded) return;
   const v = $("view");
-  ({ woche: renderWoche, verlauf: renderVerlauf, leistung: renderLeistung, ziele: renderZiele, vorlagen: renderVorlagen }[S.view] || renderWoche)(v);
+  ({ woche: renderWoche, kalender: renderKalender, verlauf: renderVerlauf, leistung: renderLeistung, ziele: renderZiele, vorlagen: renderVorlagen }[S.view] || renderWoche)(v);
 }
 function setView(v){ S.view = v; try { history.replaceState(null, "", "#" + v); } catch {} render(); window.scrollTo(0,0); }
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => setView(b.dataset.view));
-window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h && h !== S.view && ["woche","verlauf","leistung","ziele","vorlagen"].includes(h)) { S.view = h; render(); } });
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h && h !== S.view && ["woche","kalender","verlauf","leistung","ziele","vorlagen"].includes(h)) { S.view = h; render(); } });
 
 /* ---------- Woche ---------- */
 function statusIcon(st){ return st === "ok" ? "<span style='color:var(--good)'>✓</span>" : st === "plan" ? "<span style='color:var(--mid)'>◐</span>" : "<span style='color:var(--bad)'>○</span>"; }
@@ -580,7 +607,7 @@ document.addEventListener("pointermove", ev => {
   if (!drag.moved && Math.hypot(ev.clientX-drag.x, ev.clientY-drag.y) < 6) return;
   if (!drag.moved){ drag.moved = true; const g = document.createElement("div"); g.className = "dragghost"; g.textContent = drag.label; document.body.appendChild(g); drag.ghost = g; }
   drag.ghost.style.left = ev.clientX + "px"; drag.ghost.style.top = ev.clientY + "px";
-  const day = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".day");
+  const day = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-day]");
   if (day !== drag.over){ drag.over?.classList.remove("over"); day?.classList.add("over"); drag.over = day; }
   if (ev.clientY < 60) window.scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) window.scrollBy(0, 12);
 });
@@ -755,6 +782,38 @@ function minutesChart(ws){
     return { label: "KW" + isoWeek(pd(w))[1] + (w === cur ? "*" : ""), ac: t, tl, tip: Object.entries(c).map(([k,m]) => k + " " + hm(m)).join(" · ") }; });
   data.forEach((d, i) => { if (i > 0 && !d.label.endsWith("*")) d.delta = d.ac - data[i-1].ac; });
   return ibcsColumns(data, { fmt: hm, deltaFmt: v => (v > 0 ? "+" : "−") + hm(Math.abs(v)), aria: "Trainingszeit pro Woche" });
+}
+/* ---------- Monatskalender ---------- */
+function renderKalender(v){
+  const m0 = S.month, y = m0.getFullYear(), mo = m0.getMonth(), first = iso(m0), last = iso(new Date(y, mo + 1, 0));
+  const mName = m0.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
+  const start = monday(m0), end = addDays(monday(new Date(y, mo + 1, 0)), 6);
+  const all = (S.D.Einheiten||[]).filter(u => u.status !== "geloescht" && u.datum >= iso(start) && u.datum <= iso(end));
+  const inM = all.filter(u => u.datum >= first && u.datum <= last), done = inM.filter(u => u.status === "erledigt");
+  const min = done.reduce((a,u) => a + istMin(u), 0), km = done.filter(isRun).reduce((a,u) => a + num(u.distanz_km), 0), hmS = done.reduce((a,u) => a + hmOf(u), 0);
+  const plan = inM.filter(u => u.status === "geplant").length;
+  let h = "<section class='wkhead'><div class='row'><button class='btn' id='mPrev' aria-label='Vorheriger Monat'>‹</button><button class='btn' id='mNow'>Heute</button><button class='btn' id='mNext' aria-label='Nächster Monat'>›</button></div><h2>" + esc(mName) + "</h2></section>";
+  h += "<p class='msg' style='margin:0'><b>" + done.length + " Einheiten</b> erledigt, " + hm(min) + " h Training" + (km ? ", " + fmtKm(km) + " km" : "") + (hmS ? ", " + fmtInt(hmS) + " hm" : "") + "." + (plan ? " <span class='hl'>" + plan + " geplant.</span>" : "") + "</p>";
+  h += "<div class='mcal' id='board'><div class='mh'>KW</div>" + DAYS.map(d => "<div class='mh'>" + d + "</div>").join("");
+  for (let w = new Date(start); w <= end; w = addDays(w, 7)){
+    const wi = iso(w), e = evalWeek(wi), cur = wi === iso(monday(new Date())), past = wi < iso(monday(new Date()));
+    h += "<button class='mkw' data-gowk='" + wi + "' title='Woche öffnen'><span class='num'>" + isoWeek(w)[1] + "</span>" + (e.hz.length && (past || cur) ? cellHTML(e, e.ok, e.grad, cur, "KW " + isoWeek(w)[1]) : "") + "</button>";
+    for (let i = 0; i < 7; i++){
+      const d = iso(addDays(w, i)), us = all.filter(u => u.datum === d).sort((a,b) => (a.uhrzeit||"").localeCompare(b.uhrzeit||""));
+      const out = d < first || d > last;
+      h += "<div class='mday" + (out ? " out" : "") + (d === today() ? " today" : "") + "' data-day='" + d + "'><div class='mdh'><button class='mdn num' data-add='" + d + "' title='Einheit am " + dayLabel(d) + " anlegen'>" + pd(d).getDate() + "</button></div>"
+        + us.map(u => "<button class='mchip " + esc(u.status) + "' style='--cc:" + typColor(u.typ) + "' data-drag='" + esc(u.id) + "' title='" + esc((u.titel||u.typ) + " · " + u.typ + (istMin(u) ? " · " + fmtMin(istMin(u)) : "")) + "'><span>" + esc(u.titel || u.typ) + "</span></button>").join("") + "</div>";
+    }
+  }
+  h += "</div>";
+  const cats = {}; inM.forEach(u => { const k = typInfo(u.typ).kategorie; cats[k] = cats[k] || typColor(u.typ); });
+  h += "<div class='legend'>" + Object.entries(cats).map(([k,c]) => "<span><i class='sw' style='background:" + c + "'></i>" + esc(k) + "</span>").join("") + "<span><i class='sw' style='border:1px solid var(--muted)'></i>geplant (Umriss)</span></div>"
+    + "<div class='small muted'>Antippen öffnet die Einheit · ziehen verschiebt sie · Tageszahl legt eine neue Einheit an · KW öffnet die Wochenansicht</div>";
+  v.innerHTML = h;
+  $("mPrev").onclick = () => { S.month = new Date(y, mo - 1, 1); render(); };
+  $("mNext").onclick = () => { S.month = new Date(y, mo + 1, 1); render(); };
+  $("mNow").onclick = () => { const t = new Date(); S.month = new Date(t.getFullYear(), t.getMonth(), 1); render(); };
+  v.querySelectorAll("[data-gowk]").forEach(b => b.onclick = () => { S.week = pd(b.dataset.gowk); setView("woche"); });
 }
 function renderVerlauf(v){
   const ps = phases(); const ph = ps.find(p => p.id === S.phaseSel) || activePhase(); if (!ph){ v.innerHTML = "<div class='panel'>Keine Phasen angelegt.</div>"; return; }
@@ -1070,7 +1129,7 @@ function editVorlage(x){
 }
 
 /* ---------- boot ---------- */
-const h0 = location.hash.slice(1); if (["woche","verlauf","leistung","ziele","vorlagen"].includes(h0)) S.view = h0;
+const h0 = location.hash.slice(1); if (["woche","kalender","verlauf","leistung","ziele","vorlagen"].includes(h0)) S.view = h0;
 render();
 (async () => {
   const c = window.claude;
