@@ -10,7 +10,7 @@
   --bg:#ffffff; --surface:#ffffff; --sunk:#f3f3f1; --ink:#1e1e1e; --muted:#6f6f6b; --line:#e2e2de; --rule:#1e1e1e;
   --ac:#404040; --py:#b4b4b0; --pl:#404040;
   --good:#5f9a12; --bad:#d6261c; --mid:#e3a21a; --hl:#e8730a; --info:#2c6cb0; --warn:#e8730a;
-  --good-soft:#e6f0d6; --accent:#1e1e1e; --accent-ink:#ffffff;
+  --good-soft:#e6f0d6; --accent:#1e1e1e; --accent-ink:#ffffff; --fat:#7b4fa0;
   --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"IBM Plex Sans",system-ui,sans-serif;
@@ -19,12 +19,12 @@
   --bg:#151515; --surface:#151515; --sunk:#222221; --ink:#ececea; --muted:#9c9c97; --line:#2f2f2d; --rule:#ececea;
   --ac:#d4d4d0; --py:#6b6b67; --pl:#d4d4d0;
   --good:#8cc63f; --bad:#f05a4f; --mid:#f2b63c; --hl:#ff8c2a; --info:#6ea6e8; --warn:#ff8c2a;
-  --good-soft:#2a3a17; --accent:#ececea; --accent-ink:#151515; color-scheme:dark}}
+  --good-soft:#2a3a17; --accent:#ececea; --accent-ink:#151515; --fat:#b48be0; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#151515; --surface:#151515; --sunk:#222221; --ink:#ececea; --muted:#9c9c97; --line:#2f2f2d; --rule:#ececea;
   --ac:#d4d4d0; --py:#6b6b67; --pl:#d4d4d0;
   --good:#8cc63f; --bad:#f05a4f; --mid:#f2b63c; --hl:#ff8c2a; --info:#6ea6e8; --warn:#ff8c2a;
-  --good-soft:#2a3a17; --accent:#ececea; --accent-ink:#151515; color-scheme:dark}
+  --good-soft:#2a3a17; --accent:#ececea; --accent-ink:#151515; --fat:#b48be0; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums;
@@ -131,6 +131,11 @@ a{color:var(--info)}
 .dragghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-60%);background:var(--ink);color:var(--bg);font-weight:600;padding:6px 12px;box-shadow:0 6px 16px rgba(0,0,0,.2);white-space:nowrap}
 .draft{border-top:2px dashed var(--info)}
 
+.fhead{display:flex;flex-wrap:wrap;gap:6px 22px;margin-bottom:4px}
+.fh{display:flex;flex-direction:column;line-height:1.15}
+.fh b{font-family:var(--display);font-size:20px;font-weight:600}
+.fitchart{touch-action:pan-y}
+#fitSec .seg button{white-space:nowrap;padding:6px 10px}
 /* Monatskalender */
 .mcal{display:grid;grid-template-columns:150px repeat(7,minmax(0,1fr));border-top:1px solid var(--rule)}
 .mh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 6px 4px;border-bottom:1px solid var(--line)}
@@ -272,8 +277,8 @@ table.ibcs td.r,table.ibcs th.r{text-align:right;white-space:nowrap}
 const SHEET_ID = "11K-STJj8Up1AUSRQ6nWIpm5yBMa3ftp42RNFDilQJZ0";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const GS = "Google Sheets", GC = "Google Calendar";
-const TABS = { Einheiten:"A:S", Journal:"A:E", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B", Laufstatistik:"A:J" };
-const KEYCOL = { Wochen:"woche", Config:"schluessel", Typen:"typ", Laufstatistik:"monat" };
+const TABS = { Einheiten:"A:S", Journal:"A:E", Typen:"A:E", Vorlagen:"A:I", Phasen:"A:H", Hauptziele:"A:E", Ziele:"A:I", Wochen:"A:C", Benchmarks:"A:J", Benchmark_Ergebnisse:"A:I", Config:"A:B", Laufstatistik:"A:J", Fitness:"A:E" };
+const KEYCOL = { Wochen:"woche", Config:"schluessel", Typen:"typ", Laufstatistik:"monat", Fitness:"datum" };
 const DAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 
 /* ---------- utils ---------- */
@@ -995,6 +1000,61 @@ const fmtKm = x => (Math.round(x*10)/10).toFixed(1).replace(".", ",");
 const fmtInt = x => Math.round(x).toLocaleString("de-CH");
 function volumeWeeks(n){ const cur = monday(new Date()); return Array.from({length:n}, (_, i) => iso(addDays(cur, -7*(n-1-i)))).map(w => { const us = (S.D.Einheiten||[]).filter(u => u.status === "erledigt" && u.datum >= w && u.datum <= addDaysIso(w, 6));
   const runs = us.filter(isRun); return { w, label: "KW" + isoWeek(pd(w))[1] + (w === iso(cur) ? "*" : ""), cur: w === iso(cur), km: runs.reduce((a,u) => a + num(u.distanz_km), 0), hmRun: runs.reduce((a,u) => a + hmOf(u), 0), hmAll: us.reduce((a,u) => a + hmOf(u), 0), tread: runs.filter(isTread).length }; }); }
+/* ---------- Fitness / Ermüdung / Form (intervals.icu, Tab Fitness) ---------- */
+const FZ = [ { min: 20, k: "Übergang", c: "var(--mid)" }, { min: 5, k: "Frisch", c: "var(--info)" }, { min: -10, k: "Grauzone", c: "var(--muted)" }, { min: -30, k: "Optimal", c: "var(--good)" }, { min: -1e9, k: "Hohes Risiko", c: "var(--bad)" } ];
+const fZone = f => FZ.find(z => f > z.min) || FZ.at(-1);
+const formOf = r => r.ctl > 0 ? (r.ctl - r.atl) / r.ctl * 100 : 0;
+function fitRows(){ const days = { "6w": 42, "3m": 91, "6m": 182, "1j": 366 }[S.fitRange || "6m"];
+  const all = (S.D.Fitness||[]).filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.datum)).map(r => ({ d: r.datum, ctl: num(r.ctl), atl: num(r.atl), rhr: num(r.ruhepuls), hrv: num(r.hrv) })).sort((a,b) => a.d.localeCompare(b.d));
+  return all.slice(-days); }
+function fitHead(r){ const f = formOf(r), z = fZone(f);
+  return "<span class='fh'><span class='small muted'>" + dayLabel(r.d) + r.d.slice(2,4) + "</span></span><span class='fh'><span class='small muted'>Fitness</span><b style='color:var(--info)'>" + Math.round(r.ctl) + "</b></span><span class='fh'><span class='small muted'>Ermüdung</span><b style='color:var(--fat)'>" + Math.round(r.atl) + "</b></span><span class='fh'><span class='small muted'>Form</span><b style='color:" + z.c + "'>" + (f > 0 ? "+" : "") + Math.round(f) + " %</b></span><span class='fh'><span class='small muted'>Zone</span><b style='color:" + z.c + "'>" + z.k + "</b></span>"; }
+function fitnessHTML(){
+  const R = fitRows(); if (R.length < 2) return "";
+  const last = R.at(-1), f0 = formOf(last), z0 = fZone(f0);
+  const W = 900, P = 34, H1 = 190, G = 18, H2 = 120, H = H1 + G + H2 + 22;
+  const x = i => P + (W - P - 70) * i / (R.length - 1);
+  const yMax = Math.ceil(Math.max(...R.map(r => Math.max(r.ctl, r.atl))) / 10) * 10 || 10;
+  const y1 = v => 8 + (H1 - 8) * (1 - v / yMax);
+  const fMin = -60, fMax = 40, cl = v => Math.max(fMin, Math.min(fMax, v));
+  const y2 = v => H1 + G + H2 * (fMax - cl(v)) / (fMax - fMin);
+  let g = "";
+  // grid labels top
+  for (let v = 0; v <= yMax; v += yMax > 40 ? 20 : 10) g += "<line x1='" + P + "' x2='" + (W - 70) + "' y1='" + y1(v) + "' y2='" + y1(v) + "' stroke='var(--line)' stroke-width='0.6'/><text x='" + (P - 6) + "' y='" + (y1(v) + 3) + "' text-anchor='end' font-size='10' fill='var(--muted)'>" + v + "</text>";
+  const pts = k => R.map((r, i) => x(i).toFixed(1) + "," + y1(r[k]).toFixed(1)).join(" ");
+  g += "<polygon points='" + x(0) + "," + y1(0) + " " + pts("ctl") + " " + x(R.length - 1) + "," + y1(0) + "' fill='var(--info)' opacity='.1'/>";
+  g += "<polyline points='" + pts("ctl") + "' fill='none' stroke='var(--info)' stroke-width='2.2' stroke-linejoin='round'/>";
+  g += "<polyline points='" + pts("atl") + "' fill='none' stroke='var(--fat)' stroke-width='1.4' stroke-linejoin='round'/>";
+  // form bands
+  const bands = [[40,20,"var(--mid)"],[20,5,"var(--info)"],[5,-10,"var(--muted)"],[-10,-30,"var(--good)"],[-30,-60,"var(--bad)"]];
+  bands.forEach(([a,b,c]) => g += "<rect x='" + P + "' y='" + y2(a) + "' width='" + (W - 70 - P) + "' height='" + (y2(b) - y2(a)) + "' fill='" + c + "' opacity='.08'/>");
+  [20,5,-10,-30].forEach(v => g += "<text x='" + (P - 6) + "' y='" + (y2(v) + 3) + "' text-anchor='end' font-size='9' fill='var(--muted)'>" + v + "</text>");
+  bands.forEach(([a,b,c], i) => g += "<text x='" + (W - 64) + "' y='" + ((y2(a) + y2(b)) / 2 + 3) + "' font-size='10' fill='" + c + "'>" + FZ[i].k + "</text>");
+  for (let i = 1; i < R.length; i++){ const fa = formOf(R[i-1]), fb = formOf(R[i]); g += "<line x1='" + x(i-1).toFixed(1) + "' y1='" + y2(fa).toFixed(1) + "' x2='" + x(i).toFixed(1) + "' y2='" + y2(fb).toFixed(1) + "' stroke='" + fZone(fb).c + "' stroke-width='2' stroke-linecap='round'/>"; }
+  // month ticks
+  R.forEach((r, i) => { if (r.d.slice(8) === "01" || (R.length <= 50 && pd(r.d).getDay() === 1)) { const lab = r.d.slice(8) === "01" ? pd(r.d).toLocaleDateString("de-CH", { month: "short" }).replace(/\.$/, "") : r.d.slice(8) + "."; g += "<line x1='" + x(i) + "' x2='" + x(i) + "' y1='" + (H1 + G + H2) + "' y2='" + (H1 + G + H2 + 4) + "' stroke='var(--muted)'/><text x='" + x(i) + "' y='" + (H - 4) + "' text-anchor='middle' font-size='10' fill='var(--muted)'>" + lab + "</text>"; } });
+  g += "<line x1='" + P + "' x2='" + (W - 70) + "' y1='" + (H1 + G + H2) + "' y2='" + (H1 + G + H2) + "' stroke='var(--ink)'/>";
+  g += "<text x='" + (W - 64) + "' y='" + (y1(last.ctl) + 3) + "' font-size='11' font-weight='600' fill='var(--info)'>" + Math.round(last.ctl) + "</text><text x='" + (W - 64) + "' y='" + (y1(last.atl) + (Math.abs(y1(last.atl) - y1(last.ctl)) < 12 ? 14 : 3)) + "' font-size='11' font-weight='600' fill='var(--fat)'>" + Math.round(last.atl) + "</text>";
+  g += "<line id='fitCur' x1='0' x2='0' y1='0' y2='" + (H1 + G + H2) + "' stroke='var(--ink)' stroke-width='1' visibility='hidden'/>";
+  const ranges = [["6w","6 Wo"],["3m","3 Mon"],["6m","6 Mon"],["1j","1 Jahr"]];
+  const adv = z0.k === "Übergang" ? "du bist ausgeruht, verlierst aber gerade Fitness. Für Aufbau sollte die Form zwischen −10 und −30 % liegen." : z0.k === "Frisch" ? "gut erholt, bereit für eine harte Einheit oder Tour." : z0.k === "Grauzone" ? "Belastung hält die Fitness etwa, baut aber kaum auf." : z0.k === "Optimal" ? "die Fitness steigt. So weitermachen, Ruhetage einplanen." : "sehr hohe Ermüdung. Erholung einplanen, sonst droht Übertraining.";
+  return "<div class='spread'><h2>Fitness, Ermüdung, Form</h2><div class='seg' role='group' aria-label='Zeitraum'>" + ranges.map(([k,l]) => "<button data-frange='" + k + "' aria-pressed='" + ((S.fitRange || "6m") === k) + "'>" + l + "</button>").join("") + "</div></div>"
+    + "<p class='msg' style='margin:6px 0 10px'>Heute <b>Form " + (f0 > 0 ? "+" : "") + Math.round(f0) + " %</b> (<span style='color:" + z0.c + "'>" + z0.k + "</span>): " + adv + "</p>"
+    + "<div class='fhead' id='fitHead'>" + fitHead(last) + "</div>"
+    + "<div class='tblwrap'><svg class='chart fitchart' id='fitSvg' viewBox='0 0 " + W + " " + H + "' style='min-width:640px' role='img' aria-label='Fitness, Ermüdung und Form pro Tag'>" + g + "<rect id='fitHit' x='" + P + "' y='0' width='" + (W - 70 - P) + "' height='" + (H1 + G + H2) + "' fill='transparent'/></svg></div>"
+    + "<div class='legend'><span><i class='sw' style='background:var(--info)'></i>Fitness: Ø Trainingslast 42 Tage</span><span><i class='sw' style='background:var(--fat)'></i>Ermüdung: Ø Trainingslast 7 Tage</span><span>Form = (Fitness − Ermüdung) / Fitness</span></div>"
+    + "<div class='small muted'>Quelle intervals.icu, alle Sportarten mit Puls. Fitness steigt, wenn die Ermüdung über der Fitness liegt (Form im grünen Bereich). Antippen oder darüberfahren zeigt den Tag.</div>";
+}
+function bindFitness(root){
+  root.querySelectorAll("[data-frange]").forEach(b => b.onclick = () => { S.fitRange = b.dataset.frange; const sec = $("fitSec"); if (sec){ sec.innerHTML = fitnessHTML(); bindFitness(sec); } });
+  const svg = $("fitSvg"), hit = $("fitHit"); if (!svg || !hit) return;
+  const wrap = svg.parentElement; if (wrap) wrap.scrollLeft = wrap.scrollWidth;
+  const R = fitRows(), W = 900, P = 34;
+  const move = ev => { const r = svg.getBoundingClientRect(); const vx = (ev.clientX - r.left) / r.width * W; const i = Math.max(0, Math.min(R.length - 1, Math.round((vx - P) / (W - P - 70) * (R.length - 1))));
+    const xx = P + (W - P - 70) * i / (R.length - 1); const c = $("fitCur"); c.setAttribute("x1", xx); c.setAttribute("x2", xx); c.setAttribute("visibility", "visible"); $("fitHead").innerHTML = fitHead(R[i]); };
+  hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+  hit.addEventListener("pointerleave", () => { $("fitCur").setAttribute("visibility", "hidden"); $("fitHead").innerHTML = fitHead(R.at(-1)); });
+}
 function renderLeistung(v){
   const bs = (S.D.Benchmarks||[]).filter(b => b.aktiv !== "nein");
   let h = "";
@@ -1041,10 +1101,9 @@ function renderLeistung(v){
       + "<div class='ctitle'><b>Kai Gräff</b> · Grundlagen-Effizienz · <b>Pace min/km bei Puls 150</b> · lockere Läufe draussen</div><div class='tblwrap'>"
       + ibcsColumns(paD, { fmt: x => fmtSec(x), lowerBetter: true, sub: d => d.ac ? "n=" + d.n : "–", deltaFmt: x => (x > 0 ? "+" : "−") + fmtSec(Math.abs(x)), aria: "GA-Pace bei Puls 150" }) + "</div>"
       + "<div class='small muted' style='margin-bottom:18px'>Pace der lockeren Läufe draussen (Puls 125–155), umgerechnet auf Puls 150 · n = Anzahl Läufe · kürzere Säule = schneller = bessere Grundlage · grün = schneller als im Vormonat mit Daten · Laufband zählt nicht (Distanz der Uhr ungenau)</div>"
-      + "<div class='ctitle'><b>Kai Gräff</b> · Fitness (intervals.icu) · <b>Trainingslast-Schnitt 6 Wochen</b> · Monatsende</div><div class='tblwrap'>"
-      + ibcsColumns(ctD, { fmt: x => fmtInt(x), deltaFmt: x => (x > 0 ? "+" : x < 0 ? "−" : "±") + Math.abs(x).toFixed(1).replace(".", ","), aria: "Fitness-Wert pro Monat" }) + "</div>"
-      + "<div class='small muted'>Gleitender Schnitt der täglichen Trainingslast der letzten ~6 Wochen, alle Sportarten mit Puls (Laufen, Touren, Velo …) · zeigt, wie viel du zuletzt trainiert hast, nicht wie schnell du bist</div></section>";
+      + "</section>";
   }
+  if ((S.D.Fitness||[]).length > 7) h += "<section class='panel' id='fitSec'>" + fitnessHTML() + "</section>";
   // Laufzeit Soll/Ist
   const cur = monday(new Date()); const ws = Array.from({length:12}, (_, i) => iso(addDays(cur, -7*(11-i))));
   const lz = goalsOf(activePhase()?.id).flatMap(x => x.subs).find(z => z.messgroesse === "minuten" && /lauf/i.test(z.filter_werte));
@@ -1071,6 +1130,7 @@ function renderLeistung(v){
   h += "<section class='panel'><div class='spread'><h2>Lauf-Blog</h2><button class='btn primary' id='blogNew'" + (S.sample ? "" : " disabled title='Nur in claude.ai mit freigegebener KI-Funktion'") + ">Neuen Beitrag schreiben</button></div>"
     + (posts.length ? posts.map(p => "<article class='post' style='margin-top:14px'><div class='small muted'>" + dayLabel(p.datum) + "</div><h3>" + esc(p.titel) + "</h3><div class='md' style='background:none;padding:0'>" + md(p.text) + "</div></article>").join("") : "<p class='muted'>Noch keine Beiträge. Claude analysiert die Läufe seit dem letzten Beitrag und gibt einen Tipp.</p>") + "</section>";
   v.innerHTML = h;
+  bindFitness(v);
   v.querySelectorAll("[data-bnew]").forEach(btn => btn.onclick = () => { const b = bs.find(x => x.id === btn.dataset.bnew);
     openSheet("<h2>Ergebnis eintragen</h2><div class='field'><label for='bDate'>Datum</label><input type='date' id='bDate' value='" + today() + "'></div>" + benchFieldsHTML(b) + "<div class='field'><label for='bKom'>Kommentar</label><textarea id='bKom'></textarea></div><div class='spread'><button class='btn ghost' id='cx'>Abbrechen</button><button class='btn primary' id='bOk'>Speichern</button></div>", () => {
       $("cx").onclick = closeSheet; $("bOk").onclick = async () => { const res = readBench(b); if (!res){ toast("Bitte mindestens einen Messwert eintragen."); return; } const d = $("bDate").value || today(), k = $("bKom").value.trim(); closeSheet(); await saveBenchResult(b, res, { datum: d, kommentar: k }); }; }); });

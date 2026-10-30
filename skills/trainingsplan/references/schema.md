@@ -47,6 +47,9 @@ Alle Tabs: Zeile 1 = Kopfzeile, Spalten als Text formatiert. Zeilen mit leerer `
 ## Laufstatistik (`A:J`)
 `monat, laeufe, km, stunden, hm, ga_pace_150, ga_laeufe, ctl, lange_laeufe, aktualisiert_am` – eine Zeile pro Monat (`YYYY-MM`), aus intervals.icu berechnet (Routine). `ga_pace_150` = Pace der lockeren Läufe draussen (Puls 125–155) umgerechnet auf Puls 150, in Sekunden pro km. `ctl` = Fitness-Wert von intervals.icu am Monatsende (gleitender Schnitt der Trainingslast ~6 Wochen, alle Sportarten).
 
+## Fitness (`A:E`)
+`datum, ctl, atl, ruhepuls, hrv` – eine Zeile pro Tag aus intervals.icu (wellness). `ctl` = Fitness (Ø Trainingslast 42 Tage), `atl` = Ermüdung (Ø 7 Tage), Form % = (ctl − atl) / ctl × 100. Zonen: > 20 Übergang, 5…20 Frisch, −10…5 Grauzone, −30…−10 Optimal (Aufbau), < −30 Hohes Risiko.
+
 ## Config (`A:B`)
 `schluessel, wert`: `zeitzone`, `coaching_start`, `kalender_id`, `kalender_sync` (ja/nein), `benchmark_intervall_wochen_standard`, `laktat_schwelle1`, `laktat_schwelle2`, `dashboard_url`, `schema_version`, `laufband_steigung_prozent` (15).
 
