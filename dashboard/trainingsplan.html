@@ -1134,6 +1134,9 @@ function bindBench(v, bs){
 const isClimbBench = b => /klett/i.test(b.bereich || "");
 /* ---------- Klettern ---------- */
 const isClimb = u => /^Klettern/.test(typInfo(u.typ).kategorie) || /eisger|finger|boulder|klett|fels|mehrseil/i.test(u.typ);
+/* Gleiche Ziele mit anderem Namen in älteren Phasen zusammenführen */
+const SUBALIAS = { "Klettern": "Halle/Fels" };
+const subKey = z => SUBALIAS[z.bezeichnung] || z.bezeichnung;
 function renderKlettern(v){
   const curW = monday(new Date()), ws = Array.from({length: 12}, (_, i) => iso(addDays(curW, -7 * (11 - i))));
   const kh = w => evalWeek(w).hz.find(x => /klett/i.test(x.h.name));
@@ -1143,11 +1146,11 @@ function renderKlettern(v){
   let h = "<p class='msg' style='margin:0'>" + (hzNow ? "<b>Diese Woche " + subsNow.filter(s => s.st === "ok").length + " von " + subsNow.length + " Kletter-Zielen</b> erreicht" + (subsNow.some(s => s.st !== "ok") ? ", offen: <span class='hl'>" + subsNow.filter(s => s.st !== "ok").map(s => esc(s.z.bezeichnung)).join(", ") + "</span>." : ".") + " " : "")
     + "Klettern erfüllt in " + full + " von " + withHz + " Wochen, Streak " + streak(hzNow?.h.name || "Klettern") + ".</p>";
   // Subziel-Raster
-  const subNames = []; done.concat(iso(curW)).forEach(w => (kh(w)?.subs || []).forEach(s => { if (!subNames.includes(s.z.bezeichnung)) subNames.push(s.z.bezeichnung); }));
+  const subNames = []; done.concat(iso(curW)).forEach(w => (kh(w)?.subs || []).forEach(s => { const k = subKey(s.z); if (!subNames.includes(k)) subNames.push(k); }));
   if (subNames.length){
     h += "<section class='panel'><div class='ctitle'><b>Kai Gräff</b> · Kletter-Ziele · <b>Ist / Soll pro Woche</b> · letzte 12 Wochen</div><div class='hmwrap'><table class='hm'><thead><tr><th class='rl'>Subziel</th>" + ws.map(w => "<th>" + isoWeek(pd(w))[1] + "</th>").join("") + "<th>Quote</th></tr></thead><tbody>"
       + subNames.map(n => { let ok = 0, cnt = 0;
-          const cells = ws.map(w => { const s = kh(w)?.subs.find(x => x.z.bezeichnung === n), cur = w === iso(curW); if (!s) return "<td></td>";
+          const cells = ws.map(w => { const s = kh(w)?.subs.find(x => subKey(x.z) === n), cur = w === iso(curW); if (!s) return "<td></td>";
             if (!cur){ cnt++; if (s.st === "ok") ok++; }
             const cls = s.ist >= s.ziel ? "full" : s.ist / s.ziel >= 0.5 ? "mid" : (cur && s.ist === 0 ? "" : "low");
             return "<td><span class='cell num " + cls + (cur ? " cur" : "") + "' style='width:34px;display:grid;place-items:center' title='" + esc(n + " KW " + isoWeek(pd(w))[1]) + "'>" + (s.z.messgroesse === "minuten" ? Math.round(s.ist) : s.ist) + "/" + (s.z.messgroesse === "minuten" ? Math.round(s.ziel) : s.ziel) + "</span></td>"; }).join("");
