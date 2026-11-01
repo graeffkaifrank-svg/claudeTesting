@@ -50,6 +50,8 @@ a{color:var(--info)}
   display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;justify-content:space-between}
 .brand{display:flex;align-items:baseline;gap:4px 14px;flex-wrap:wrap;padding-bottom:10px}
 .eyebrow{font-size:12px;color:var(--muted);width:100%}
+.reload{min-height:28px;padding:2px 10px;font-size:12px;color:var(--muted)}
+.reload:hover{color:var(--ink)}
 .sign{font:inherit}
 .tabs{display:flex;gap:2px}
 .tab{border:0;background:none;padding:8px 10px 10px;font-weight:500;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
@@ -257,7 +259,7 @@ table.ibcs td.r,table.ibcs th.r{text-align:right;white-space:nowrap}
 
 <div class="wrap">
   <header class="bar">
-    <div class="brand"><span class="eyebrow">Kai Gräff · Bergführer-Ausbildung · <span id="phaseSign">Trainingsplan</span></span><h1>Kais Trainingsapp</h1><span class="small muted" id="fresh"></span></div>
+    <div class="brand"><span class="eyebrow">Kai Gräff · Bergführer-Ausbildung · <span id="phaseSign">Trainingsplan</span></span><h1>Kais Trainingsapp</h1><span class="small muted" id="fresh"></span><button class="btn ghost reload" id="reload" title="Neueste Daten aus dem Sheet laden">↻ Aktualisieren</button></div>
     <nav class="tabs" aria-label="Ansichten">
       <button class="tab" data-view="woche">Woche</button>
       <button class="tab" data-view="kalender">Kalender</button>
@@ -501,6 +503,7 @@ function render(){
 }
 function setView(v){ S.view = v; try { history.replaceState(null, "", "#" + v); } catch {} render(); window.scrollTo(0,0); }
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => setView(b.dataset.view));
+$("reload").onclick = async () => { const b = $("reload"); if (b.disabled) return; b.disabled = true; b.textContent = "↻ Lädt …"; evalCache = new Map(); await loadAll(true); b.disabled = false; b.textContent = "↻ Aktualisieren"; toast("Daten aktualisiert"); };
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h && h !== S.view && ["woche","kalender","verlauf","laufen","klettern","ziele","vorlagen"].includes(h)) { S.view = h; render(); } });
 
 /* ---------- Woche ---------- */
