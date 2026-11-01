@@ -87,7 +87,7 @@ Zeige den Vorschlag als Liste (Tag, Vorlage, Dauer, ein Satz Begründung) und **
 „Schreib einen Blog-Beitrag“ / „analysier meine letzten Läufe“: Läufe seit dem letzten `Journal`-Eintrag (sonst 14 Tage) lesen. Kurzer Beitrag (max. 160 Wörter, sachlich): 1 Satz Überblick, „Was auffällt“ (2–4 Punkte mit Zahlen: Dauer, Pace, Puls, GA1 vs. Intervall, Muster in Kommentaren), „Tipp“ (genau ein konkreter Tipp für 1–2 Wochen). Als Zeile in `Journal` speichern (`quelle = sprache`).
 
 ### 6. Neue Phase nach Coaching
-Kai nennt Coaching-Datum und neue Ziele. Dann: alte aktive Phase `status = abgeschlossen`, `ende` = Tag vor Start. Neue Zeile in `Phasen` (`id` fortlaufend `P-05`, …; `status = aktiv`, Fokus, Coaching-Notizen, ggf. Notion-Link). Hauptziele und Subziele anlegen (Struktur: Klettern / Laufen / Beine, sofern Kai nichts anderes sagt). Danach den Bericht der abgeschlossenen Phase anbieten.
+Kai nennt Coaching-Datum und neue Ziele. Dann: alte aktive Phase `status = abgeschlossen`, `ende` = Tag vor Start. Neue Zeile in `Phasen` (`id` fortlaufend `P-05`, …; `status = aktiv`, Fokus, Coaching-Notizen, ggf. Notion-Link). Hauptziele und Subziele anlegen (Struktur aktuell: Klettern / Laufen / Wintervorbereitung = Beinkraft + Eisgeräte, sofern Kai nichts anderes sagt). Danach den Bericht der abgeschlossenen Phase anbieten.
 
 ### 7. Bericht für Michi
 Für eine Phase (oder seit Coaching-Start 2026-03-20): Erfüllung je Hauptziel und Subziel (x von y Wochen), längste und aktuelle Streak, Stunden je Kategorie, Wochenraster, auffällige Kommentare, 4–6 Sätze Einschätzung mit 1–2 Fragen fürs Coaching. Als PDF mit dem pdf-Skill erstellen, oder auf den Button „PDF für Michi“ im Dashboard (Ansicht Verlauf) verweisen.
